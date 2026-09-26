@@ -109,6 +109,14 @@ All service endpoints:
 - A controller is bound to one origin; navigation elsewhere is blocked. The
   shipped `MockExtranetController` refuses non-loopback targets entirely.
 - Run parameters (test data, secrets for replay) are never persisted.
+- **Real-browser replays** (Phase 11, ADR-0007): a `BrowserTargetPolicy` exists
+  only after the shared policy allows the run, and requires the target origin
+  in an explicit allowlist (exact origins; https for remote, http for loopback
+  only). The browser's traffic is confined three times: request routing, a
+  per-session loopback **egress proxy** that checks every connection including
+  redirect hops, CONNECT tunnels and WebSockets, and a landing check after each
+  navigation. Service workers are blocked, downloads refused, dialogs
+  dismissed. State capture never reads password or sensitive fields.
 
 ## Data at rest
 

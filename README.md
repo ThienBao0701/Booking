@@ -42,11 +42,12 @@ account.
 | 8 | Analyzer: segmentation, timing, sequences, anomalies, comparison, correlation, graph, evidence + JSON rule engine | ✅ |
 | 9 | Forensic dashboard at `/dashboard/`: overview, sessions + compare, timeline, workflow graph, events, findings drill-down, environment, runs, screenshots, settings | ✅ |
 | 10 | Forensic reports: JSON · CSV (findings / events / evidence) · HTML · print-ready HTML, 11 sections, every finding linked to its exact event ids; API, CLI, dashboard | ✅ |
-| 11–15 | Security hardening · packaging · Windows installer | ⬜ (CI, lint, tests in place) |
+| 11 | Browser adapter: Chromium via Playwright/CDP behind the controller interface; target policy + explicit origin allowlist + per-session egress proxy | ✅ |
+| 12–15 | Screenshot storage · dashboard replay · native messaging · Windows production hardening | ⬜ next |
 
-**Tests:** 284 unit · 14 E2E on the mock at 127.0.0.1:4599 (incl. the full
-OBSERVE → RECORD → REPLAY → ANALYZE → COMPARE → REPORT pipeline) · 11
-real-browser (built extension and dashboard in Chromium). Lint, typecheck (6 configs) and the verified
+**Tests:** 304 unit · 14 E2E on the mock at 127.0.0.1:4599 (incl. the full
+OBSERVE → RECORD → REPLAY → ANALYZE → COMPARE → REPORT pipeline) · 14
+real-browser (built extension, dashboard and browser adapter in Chromium). Lint, typecheck (6 configs) and the verified
 extension build run in CI. See [docs/10-testing.md](docs/10-testing.md).
 
 ## Quick start
@@ -115,6 +116,7 @@ docs/              source-of-truth documentation + ADRs
 | Workflow analysis, rules, findings | [14-analysis](docs/14-analysis.md) |
 | Forensic dashboard | [15-dashboard](docs/15-dashboard.md) |
 | Forensic reports | [16-reports](docs/16-reports.md) |
+| Browser adapter (real-browser replay) | [17-browser-adapter](docs/17-browser-adapter.md) |
 | ADRs | [docs/adr](docs/adr/) |
 
 ## Safety modes

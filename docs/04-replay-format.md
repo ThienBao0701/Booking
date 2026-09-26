@@ -64,6 +64,10 @@ navigate, reload, back, forward, click, type, select, waitFor, captureState,
 captureScreenshot, getCurrentUrl, getPageMetadata, snapshot?, restore?, close`.
 Failures are `ControllerError`s with a stable `code` and a `retryable` flag.
 
+Two controllers ship: `MockExtranetController` (default, below) and the
+real-browser `BrowserAdapterController` (Chromium via Playwright, explicit
+origin allowlist and egress proxy — [17-browser-adapter](17-browser-adapter.md)).
+
 ### Mock Extranet controller semantics
 
 `MockExtranetController` drives the mock's page model over HTTP with browser
@@ -149,7 +153,9 @@ not have — the controller fails such steps faithfully.
 
 ```bash
 pnpm run replay <workflow.json> [--mode SIMULATE] [--dry-run] [--mock-only] \
-  [--param name=value ...] [--params-file f.json] [--db .lab-runtime/lab.sqlite] [--json]
+  [--param name=value ...] [--params-file f.json] [--db .lab-runtime/lab.sqlite] [--json] \
+  [--controller mock|browser] [--allow-origin <origin> ...] [--resource-origin <origin> ...] \
+  [--headed] [--browser-path <chrome>]
 pnpm run replay:example        # the full-flow example against the mock
 ```
 

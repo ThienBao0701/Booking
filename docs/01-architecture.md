@@ -1,6 +1,6 @@
 # 01 — Architecture
 
-Status: **v1.1** (Phases 0–10 implemented) · Scope: local, single-operator diagnostics lab.
+Status: **v1.1** (Phases 0–11 implemented) · Scope: local, single-operator diagnostics lab.
 
 This document is the source of truth for structure and boundaries. Any change
 to the boundaries below must be proposed as an ADR (see `docs/adr/`) before
@@ -50,7 +50,9 @@ Local Background Service (windows-service/)                   [Phase 3]
    │    recording → workflow draft (convert.ts)
    │    ReplayEngine ── authorization BEFORE execution ──► BrowserController
    │                                                          │
-   │                          MockExtranetController ◄────────┘ (one origin, loopback only)
+   │                          MockExtranetController ◄────────┤ (one origin, loopback only)
+   │                          BrowserAdapterController ◄──────┘ (Chromium via Playwright; allowlist +
+   │                                                              egress proxy; ADR-0007)  [Phase 11]
    │                                   │
    ▼                                   ▼
 Analyzer · Dashboard · Reports   Mock Extranet (mock-extranet/)   [Phase 5]

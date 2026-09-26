@@ -33,6 +33,8 @@ const EVASION_PATTERNS = [
   [/Object\.defineProperty\(\s*(?:window\.)?(?:navigator|screen)\b/, "overriding navigator/screen properties (fingerprint spoofing)"],
   [/\bnavigator\.webdriver\s*=/, "assigning navigator.webdriver (bot-detection evasion)"],
   [/\bchrome\.(?:proxy|debugger)\b/, "chrome.proxy / chrome.debugger APIs (IP rotation / CDP manipulation)"],
+  [/AutomationControlled|--disable-blink-features/, "suppressing Chromium's automation indicators (bot-detection evasion)"],
+  [/\bignoreDefaultArgs\b|\bstealth\b/i, "altering the browser's default automation arguments / stealth plugins"],
 ];
 
 // Recorded data is untrusted: the dashboard builds DOM with text nodes only (ADR-0006).

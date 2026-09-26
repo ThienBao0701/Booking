@@ -14,9 +14,9 @@
 
 `pnpm run test` = unit + E2E. `pnpm run verify` = lint + typecheck + test + build.
 
-Counts at this revision: **284 unit** (62 shared · 137 service · 11 mock ·
-62 extension · 12 dashboard), **14 E2E**, **11 real-browser** (2 extension ·
-9 dashboard). Earlier tests are unchanged and still pass.
+Counts at this revision: **304 unit** (62 shared · 157 service · 11 mock ·
+62 extension · 12 dashboard), **14 E2E**, **14 real-browser** (2 extension ·
+9 dashboard · 3 browser adapter). Earlier tests are unchanged and still pass.
 
 ## What the E2E suites prove
 
@@ -99,6 +99,13 @@ Counts at this revision: **284 unit** (62 shared · 137 service · 11 mock ·
   HTML links to exact event ids).
 - **Browser:** the Reports page downloads byte-exact JSON / CSV / print HTML
   and previews a styled, script-free HTML report.
+
+## What the browser-adapter suites prove (Phase 11)
+
+See [17-browser-adapter](17-browser-adapter.md#tests): authorization and the
+explicit allowlist gate every browser launch; nothing reaches a
+non-allowlisted origin in a real Chromium (images, fetches, links, direct
+navigation, redirect hops); the example workflow replays on the real mock UI.
 
 ## The mock at 127.0.0.1:4599
 
