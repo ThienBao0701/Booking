@@ -53,10 +53,45 @@ export interface PolicyDecision {
     | "MODE_FORBIDS_SIDE_EFFECTS"
     | "MODE_FORBIDS_AUTHORIZED_TARGET"
     | "MISSING_AUTHORIZATION"
+    | "MOCK_TARGET_NOT_LOCAL"
     | "INVALID_MODE"
     | "UNKNOWN_TARGET";
   /** Human-readable explanation. */
   reason: string;
+}
+
+/**
+ * True only for an http(s) URL whose host is exactly a loopback host
+ * (127.0.0.1, localhost, [::1]). URLs carrying userinfo ("user@host") are
+ * rejected outright to avoid authority-confusion tricks such as
+ * "http://127.0.0.1@evil.example". Dependency-free (no URL global needed).
+ */
+export function isLoopbackUrl(url: string): boolean {
+  if (typeof url !== "string") return false;
+  const m = /^https?:\/\/([^/?#]*)(?:[/?#]|$)/i.exec(url.trim());
+  if (!m) return false;
+  const authority = m[1] ?? "";
+  if (authority.length === 0 || authority.includes("@")) return false;
+
+  let host: string;
+  let port = "";
+  if (authority.startsWith("[")) {
+    const end = authority.indexOf("]");
+    if (end < 0) return false;
+    host = authority.slice(0, end + 1);
+    const rest = authority.slice(end + 1);
+    if (rest.length > 0) {
+      if (!rest.startsWith(":")) return false;
+      port = rest.slice(1);
+    }
+  } else {
+    const idx = authority.lastIndexOf(":");
+    host = idx >= 0 ? authority.slice(0, idx) : authority;
+    port = idx >= 0 ? authority.slice(idx + 1) : "";
+  }
+  if (port.length > 0 && !/^\d{1,5}$/.test(port)) return false;
+  host = host.toLowerCase();
+  return host === "127.0.0.1" || host === "localhost" || host === "[::1]";
 }
 
 function ok(): PolicyDecision {
@@ -103,6 +138,16 @@ export function evaluateReplay(mode: SafetyMode, target: ReplayTarget): PolicyDe
   }
 
   if (target.kind === "mock") {
+    // "mock" is a self-declared label; it only means something if the target is
+    // actually local. A non-loopback URL labelled "mock" would otherwise let
+    // SIMULATE drive a real system (ADR-0004).
+    if (!isLoopbackUrl(target.baseUrl)) {
+      return deny(
+        "MOCK_TARGET_NOT_LOCAL",
+        `mock target must be a loopback URL (127.0.0.1 / localhost / [::1]); got "${String(target.baseUrl)}". ` +
+          `Use kind "authorized" with an authorization record and AUTHORIZED_AUTOMATION for non-local systems.`,
+      );
+    }
     return ok();
   }
 
