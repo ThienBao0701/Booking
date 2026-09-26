@@ -66,3 +66,21 @@ jobs:
         with:
           name: lab-extension
           path: extension/dist
+
+  browser:
+    name: real-browser E2E (built MV3 extension in Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+      - name: Install (locked)
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium for playwright-core
+        run: node node_modules/playwright-core/cli.js install --with-deps chromium
+      - name: Browser E2E — record in Chromium → service → draft → replay on the mock
+        run: pnpm run test:browser

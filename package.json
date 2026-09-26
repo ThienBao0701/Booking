@@ -20,6 +20,7 @@
     "@types/chrome": "^0.3.0",
     "@types/node": "^22.10.0",
     "esbuild": "^0.25.0",
+    "playwright-core": "1.56.1",
     "typescript": "^5.9.2"
   },
   "scripts": {
@@ -40,7 +41,8 @@
     "start:watchdog": "node --experimental-strip-types --experimental-sqlite windows-service/src/watchdog.ts",
     "start:mock": "node --experimental-strip-types mock-extranet/src/index.ts",
     "replay": "node --experimental-strip-types --experimental-sqlite windows-service/src/automation/cli.ts",
-    "replay:example": "node --experimental-strip-types --experimental-sqlite windows-service/src/automation/cli.ts examples/workflows/mock-full-flow.json --params-file examples/workflows/mock-full-flow.params.json"
+    "replay:example": "node --experimental-strip-types --experimental-sqlite windows-service/src/automation/cli.ts examples/workflows/mock-full-flow.json --params-file examples/workflows/mock-full-flow.params.json",
+    "test:browser": "node --test --test-concurrency=1 --experimental-strip-types --experimental-sqlite tests/browser/*.test.ts"
   },
   "keywords": [
     "diagnostics",
