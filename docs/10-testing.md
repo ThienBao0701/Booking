@@ -135,6 +135,17 @@ handled; install / upgrade / uninstall leave nothing behind; a real Chromium
 delivers a recorded session through the installed host and falls back to HTTP
 after uninstall.
 
+## What the deployment suites prove (Phase 15)
+
+See [21-windows-deployment](21-windows-deployment.md#tests): the task
+definition runs the supervisor at logon without elevation and restarts it;
+install / upgrade / rollback / uninstall keep data and configuration and leave
+nothing behind; the supervisor restarts crashed and hung services, never
+leaves an orphan, handles a taken port and bad configuration; a corrupted
+config never widens anything; logs rotate within limits; after a simulated
+reboot the extension reconnects and delivers what it queued. Task Scheduler
+itself is simulated (Linux CI).
+
 ## The mock at 127.0.0.1:4599
 
 E2E tests target `MOCK_EXTRANET_URL` (default `http://127.0.0.1:4599`, must be

@@ -2,9 +2,14 @@
 
 The local service (`windows-service/`) is a Node.js process that binds to
 `127.0.0.1` only. Crash recovery is provided by the bundled **watchdog**
-(restart with exponential backoff, single-instance lock). Start-at-logon is
-provided by **Windows Task Scheduler** until the Phase 15 installer registers a
-proper Windows service.
+(restart with exponential backoff, health monitoring, single-instance lock).
+Start-at-logon is provided by **Windows Task Scheduler**.
+
+> **Recommended (Phase 15):** `deploy\windows\lab.cmd install` does all of the
+> below — private runtime, versioned releases, config file, task registration,
+> health-checked upgrades with rollback, uninstall. See
+> [21 — Windows deployment](21-windows-deployment.md). The manual steps here
+> remain valid for running from a checkout.
 
 > Status: the service, watchdog and entry points are covered by CI on Linux,
 > including a regression test for Windows-style entry-point detection. The
@@ -95,13 +100,13 @@ Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\BrowserAutomationLab"   # data, logs, token
 ```
 
-## Known limitations (addressed by the Phase 15 installer)
+## Known limitations
 
-- **Orphaned child on forced stop.** Ending the watchdog task does not end its
-  service child on Windows; a new watchdog then sees port 4577 in use and backs
-  off while the orphan keeps serving. Use the stop commands above. The
-  installer will run the service under a Windows service wrapper with a job
-  object so children stop together.
+- ~~Orphaned child on forced stop~~ — fixed in Phase 15: the service is
+  spawned with an IPC channel and exits when its watchdog disappears, so
+  ending the task stops both (ADR-0010).
 - **Per-user logon start**, not boot start before logon (the recorder only
-  runs in your browser session, so this is usually what you want).
-- Node.js must be installed separately; the installer will bundle it.
+  runs in your browser session, so this is usually what you want; ADR-0010
+  records the SCM-service alternative).
+- Node.js must be installed to run the installer; `lab install` then bundles
+  a private copy of that runtime for the service.

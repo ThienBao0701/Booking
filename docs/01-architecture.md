@@ -105,9 +105,9 @@ CSV, HTML and print-ready HTML; every finding links to its exact event ids.
 |--------------------|------------------------------------------------------------|-------------------|
 | `shared`           | Contracts: event/recorder/workflow/replay/analysis schemas, **safety policy**, redaction, finding language guard, ids/time | (nothing internal) |
 | `extension`        | MV3 capture, redaction-at-source, recorder, bridge client  | `shared`          |
-| `windows-service`  | localhost API, event bus, SQLite, logs, watchdog, automation engine (controller host), analyzer + rule engine, forensic reports | `shared` |
+| `windows-service`  | localhost API, event bus, SQLite, logs, watchdog (supervisor), automation engine (controller host), analyzer + rule engine, forensic reports, dashboard replay manager (ADR-0008), native messaging host (ADR-0009), Windows deployment + config management (ADR-0010) | `shared` |
 | `mock-extranet`    | Safe automation target that emits production-shaped events  | `shared`          |
-| `dashboard`        | Static SPA served by the service at `/dashboard/`: read/visualize sessions, timelines, workflows, events, findings, environment, runs; edit analysis rules (ADR-0006). Triggering replays stays planned. | `shared`          |
+| `dashboard`        | Static SPA served by the service at `/dashboard/`: read/visualize sessions, timelines, workflows, events, findings, environment, runs; edit analysis rules (ADR-0006); plan and start replays after an explicit acknowledgement (ADR-0008). | `shared`          |
 
 **Import rule (enforced by `scripts/lint.mjs` in CI):** everything depends on
 `shared`, only through each package's `src/shared.ts`; `shared` depends on

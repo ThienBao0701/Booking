@@ -46,7 +46,7 @@ account.
 | 12 | Screenshot storage: optional local PNGs (off by default), bound to their capture event, retention / size / budget limits, delete; dashboard shows the images | ✅ |
 | 13 | Dashboard replay: dry-run plan → review (target, authorization, workflow, step count, risk notice) → explicit acknowledged start; live progress, controls, logs; service mode is the ceiling | ✅ |
 | 14 | Native messaging: extension → native host (validated relay, handshake + version negotiation, origin check, route/header allowlist) → service; HTTP loopback fallback; per-user install/uninstall | ✅ |
-| 15 | Windows production hardening | ⬜ next |
+| 15 | Windows deployment: `lab install/upgrade/uninstall/status`, Task Scheduler registration (logon, least privilege), private runtime, versioned releases with health-checked rollback, config file with last-good recovery, supervisor health monitoring + no orphans, log rotation | ✅ |
 
 **Tests:** 316 unit · 14 E2E on the mock at 127.0.0.1:4599 (incl. the full
 OBSERVE → RECORD → REPLAY → ANALYZE → COMPARE → REPORT pipeline) · 15
@@ -123,6 +123,7 @@ docs/              source-of-truth documentation + ADRs
 | Screenshot storage | [18-screenshot-storage](docs/18-screenshot-storage.md) |
 | Dashboard replay | [19-dashboard-replay](docs/19-dashboard-replay.md) |
 | Native messaging | [20-native-messaging](docs/20-native-messaging.md) |
+| Windows deployment | [21-windows-deployment](docs/21-windows-deployment.md) |
 | ADRs | [docs/adr](docs/adr/) |
 
 ## Safety modes
@@ -135,11 +136,16 @@ docs/              source-of-truth documentation + ADRs
 
 ## Production deployment
 
-Current release: run the service under the watchdog, auto-started at logon on
-Windows ([doc 13](docs/13-windows-service-setup.md)); load the built extension
-unpacked. Planned (Phases 11–15): security hardening pass, signed extension
-package, `setup.exe` that installs Node, the service (as a Windows service with
-job-object supervision) and the extension helper.
+Windows, per user, no administrator rights ([doc 21](docs/21-windows-deployment.md),
+ADR-0010): `deploy\windows\lab.cmd install` copies a release and a private
+Node.js runtime to `%LOCALAPPDATA%\AutomationLab`, writes a validated
+`config.json`, registers the **AutomationLab** task (supervisor at logon,
+restart on failure) and waits for `/healthz`. `lab status | start | stop |
+restart | upgrade | uninstall | config` operate it; upgrades are
+health-checked and roll back automatically. The supervisor restarts crashed or
+hung services and never leaves an orphaned process. Optional: the native
+messaging host (`--extension-id`). Still planned: a signed extension package
+and a `setup.exe` wrapper around `lab install`.
 
 ## License
 

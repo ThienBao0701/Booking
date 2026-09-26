@@ -52,6 +52,11 @@ export interface InstallTarget {
   home?: string;
   /** Extra profiles: `<dir>/NativeMessagingHosts/` (POSIX only; Windows uses the registry). */
   userDataDirs?: readonly string[];
+  /**
+   * Path syntax of the file system being written (default: the platform's).
+   * Plans for another OS are pure; applied plans must use the local syntax.
+   */
+  pathStyle?: "win32" | "posix";
 }
 
 export interface InstallOptions extends InstallTarget {
@@ -89,12 +94,12 @@ export interface UninstallPlan {
   dirs: string[];
 }
 
-function pathApi(platform: NodeJS.Platform): typeof posix {
-  return platform === "win32" ? win32 : posix;
+function pathApi(platform: NodeJS.Platform, style?: "win32" | "posix"): typeof posix {
+  return (style ?? (platform === "win32" ? "win32" : "posix")) === "win32" ? win32 : posix;
 }
 
 function manifestLocations(t: InstallTarget): string[] {
-  const p = pathApi(t.platform);
+  const p = pathApi(t.platform, t.pathStyle);
   const out: string[] = [];
   if (t.platform !== "win32") {
     const table = t.platform === "darwin" ? MAC_DIR : LINUX_DIR;
@@ -134,7 +139,7 @@ export function launcherContent(platform: NodeJS.Platform, nodePath: string, hos
 }
 
 export function planInstall(o: InstallOptions): InstallPlan {
-  const p = pathApi(o.platform);
+  const p = pathApi(o.platform, o.pathStyle);
   if (!p.isAbsolute(o.installDir) || !p.isAbsolute(o.nodePath) || !p.isAbsolute(o.hostEntry) || !p.isAbsolute(o.logDir)) {
     throw new InstallError("installDir, nodePath, hostEntry and logDir must be absolute paths");
   }
@@ -170,7 +175,7 @@ export function planInstall(o: InstallOptions): InstallPlan {
 }
 
 export function planUninstall(t: InstallTarget): UninstallPlan {
-  const p = pathApi(t.platform);
+  const p = pathApi(t.platform, t.pathStyle);
   const own = [MANIFEST_FILE, CONFIG_FILE, t.platform === "win32" ? LAUNCHER_WIN : LAUNCHER_POSIX].map((f) => p.join(t.installDir, f));
   return { platform: t.platform, files: [...own, ...manifestLocations(t)], registryKeys: registryKeys(t), dirs: [t.installDir] };
 }
@@ -271,7 +276,7 @@ export interface NativeHostStatus {
 
 /** Read back what is installed and whether it is consistent. */
 export function nativeHostStatus(t: InstallTarget, fx: InstallEffects = nodeEffects): NativeHostStatus {
-  const p = pathApi(t.platform);
+  const p = pathApi(t.platform, t.pathStyle);
   const manifestPath = p.join(t.installDir, MANIFEST_FILE);
   const problems: string[] = [];
   let allowedOrigins: string[] = [];

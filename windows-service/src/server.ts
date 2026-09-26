@@ -54,6 +54,8 @@ export interface Ctx {
   analysis?: AnalysisService;
   /** Screenshot storage (Phase 12). Created on demand (disabled by default). */
   screenshots?: ScreenshotService;
+  /** Phase 15: where the configuration came from ("recovered" after a bad config file). */
+  configStatus?: "ok" | "recovered";
   /** Dashboard replays (Phase 13). Created on demand. */
   replay?: ReplayManager;
   library?: WorkflowLibrary;
@@ -129,6 +131,7 @@ export function createApiServer(ctx: Ctx): Server {
         schemaVersion: store.getMeta("schema_version") ?? null,
         safetyMode: config.safetyMode,
         busSubscribers: bus.size,
+        config: ctx.configStatus ?? "ok",
       });
       return done(200);
     }

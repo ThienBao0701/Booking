@@ -1,8 +1,9 @@
 # 11 — Installation
 
-This is the developer/operator installation for the current release (Phases
-0–7). A packaged Windows installer (`setup.exe`) is planned for Phase 15; until
-then the components run from a checkout with Node.js.
+This is the developer/operator installation. On Windows, `deploy\windows\lab.cmd
+install` (Phase 15) deploys the service for the current user from a built
+checkout — see [21 — Windows deployment](21-windows-deployment.md); otherwise
+the components run from a checkout with Node.js.
 
 ## Prerequisites
 
@@ -89,6 +90,11 @@ See [15 — Dashboard](15-dashboard.md).
 | `LAB_DASHBOARD_DIR` | `dashboard/dist` | built dashboard served at `/dashboard/` |
 | `LAB_WORKFLOWS_DIR` | `<LAB_DATA_DIR>/workflows` | workflow library for dashboard replays |
 | `LAB_NATIVE_HOST_CONFIG` | — | native host config path when the launcher passes no `--config` ([20](20-native-messaging.md)) |
+| `LAB_LOG_MAX_BYTES` / `LAB_LOG_MAX_FILES` | 5 MiB / 5 | log rotation ([21](21-windows-deployment.md)) |
+
+Settings can also live in `<LAB_DATA_DIR>/config.json` (validated; a bad file
+falls back to the last good copy or safe defaults); environment variables win
+over the file. See [21 — Windows deployment](21-windows-deployment.md#operate).
 | `LAB_BROWSER_EXECUTABLE` | Playwright's Chromium | browser for real-browser dashboard replays |
 | `MOCK_EXTRANET_HOST` / `_PORT` | `127.0.0.1` / `4599` | mock |
 | `MOCK_EXTRANET_URL` | `http://127.0.0.1:4599` | E2E target (must be loopback) |

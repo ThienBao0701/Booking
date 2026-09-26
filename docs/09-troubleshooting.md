@@ -35,6 +35,20 @@
   sensitive after redaction (e.g. an email, a long digit run, or a 9+ digit
   number such as an epoch timestamp inside `data`). Keep times in the envelope.
 
+### Deployed service (Phase 15)
+
+- **`lab status` says the service is not answering** — read
+  `data\logs\supervisor.log`: `supervisor_port_in_use` (another program holds
+  the port: free it or `lab config set port=…` + `lab restart`),
+  `supervisor_config_error` (an invalid `LAB_*` environment variable),
+  `supervisor_unhealthy` (the service stopped answering and was restarted).
+- **`/healthz` shows `"config": "recovered"`** — `config.json` is corrupted or
+  invalid; the service runs on the last good copy or safe defaults.
+  `lab config validate` names the problem; fix it with `lab config set …`.
+- **An upgrade reports "rolled back"** — the new release did not become
+  healthy; the previous one is running. Check `service.log` for the new
+  release's start-up error.
+
 ## Extension
 
 - **Popup says "not paired"** — set the token in Options.

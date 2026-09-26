@@ -21,6 +21,9 @@ export interface ServiceConfig {
   dashboardDir?: string;
   /** Operator workflow library for dashboard replays (default: <dataDir>/workflows). */
   workflowsDir?: string;
+  /** Log rotation (Phase 15): roll size and rolled files kept. */
+  logMaxBytes?: number;
+  logMaxFiles?: number;
 }
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
@@ -50,6 +53,15 @@ export interface ConfigEnv {
   LAB_LOG_LEVEL?: string;
   LAB_DASHBOARD_DIR?: string;
   LAB_WORKFLOWS_DIR?: string;
+  LAB_LOG_MAX_BYTES?: string;
+  LAB_LOG_MAX_FILES?: string;
+}
+
+function parseIntIn(name: string, v: string | undefined, lo: number, hi: number): number | undefined {
+  if (v === undefined || v === "") return undefined;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < lo || n > hi) throw new ConfigError(`invalid ${name}: ${v} (${lo}..${hi})`);
+  return n;
 }
 
 /**
@@ -88,5 +100,10 @@ export function loadConfig(env: ConfigEnv, authToken: string): ServiceConfig {
     logLevel: level as ServiceConfig["logLevel"],
     ...(env.LAB_DASHBOARD_DIR ? { dashboardDir: env.LAB_DASHBOARD_DIR } : {}),
     ...(env.LAB_WORKFLOWS_DIR ? { workflowsDir: env.LAB_WORKFLOWS_DIR } : {}),
+    ...(() => {
+      const maxBytes = parseIntIn("LAB_LOG_MAX_BYTES", env.LAB_LOG_MAX_BYTES, 64 * 1024, 1024 * 1024 * 1024);
+      const maxFiles = parseIntIn("LAB_LOG_MAX_FILES", env.LAB_LOG_MAX_FILES, 1, 50);
+      return { ...(maxBytes !== undefined ? { logMaxBytes: maxBytes } : {}), ...(maxFiles !== undefined ? { logMaxFiles: maxFiles } : {}) };
+    })(),
   };
 }
