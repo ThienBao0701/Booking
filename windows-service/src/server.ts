@@ -23,69 +23,28 @@ import {
   LAB_VERSION,
 } from "./shared.ts";
 import { recordingToWorkflow } from "./automation/convert.ts";
+import { HttpError, MAX_BODY_BYTES, readBody, send } from "./http.ts";
+import { AnalysisService } from "./analysis/service.ts";
+import { routeAnalysis } from "./routes/analysis.ts";
 
-const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2 MiB per request
 /** Max events accepted per POST /v1/events (request validation; bridge batches below this). */
 export const MAX_BATCH_EVENTS = 500;
 const START_TS = Date.now();
 
-interface Ctx {
+export interface Ctx {
   config: ServiceConfig;
   store: Store;
   bus: EventBus;
   logger: Logger;
   limiter: RateLimiter;
-}
-
-function send(res: ServerResponse, status: number, body: unknown): void {
-  const json = JSON.stringify(body);
-  res.writeHead(status, {
-    "content-type": "application/json; charset=utf-8",
-    "x-content-type-options": "nosniff",
-    "cache-control": "no-store",
-  });
-  res.end(json);
-}
-
-/** A client error with an HTTP status (request validation), never a 500. */
-class HttpError extends Error {
-  readonly status: number;
-  readonly code: string;
-  constructor(status: number, code: string) {
-    super(code);
-    this.status = status;
-    this.code = code;
-  }
-}
-
-async function readBody(req: IncomingMessage): Promise<unknown> {
-  return await new Promise((resolve, reject) => {
-    let size = 0;
-    const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => {
-      size += c.length;
-      if (size > MAX_BODY_BYTES) {
-        reject(new HttpError(413, "payload_too_large"));
-        req.resume(); // drain without buffering so the 413 can be sent
-        return;
-      }
-      chunks.push(c);
-    });
-    req.on("end", () => {
-      if (size > MAX_BODY_BYTES) return;
-      if (chunks.length === 0) return resolve(undefined);
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
-      } catch {
-        reject(new HttpError(400, "invalid_json"));
-      }
-    });
-    req.on("error", reject);
-  });
+  /** Workflow analyzer (Phase 8). Created on demand when not supplied. */
+  analysis?: AnalysisService;
 }
 
 export function createApiServer(ctx: Ctx): Server {
   const { config, store, bus, logger, limiter } = ctx;
+  const analysis = ctx.analysis ?? new AnalysisService({ store, dataDir: config.dataDir });
+  const routeCtx = { ...ctx, analysis };
 
   return createServer((req, res) => {
     const started = Date.now();
@@ -143,7 +102,7 @@ export function createApiServer(ctx: Ctx): Server {
     }
 
     // 6) Routes.
-    void route(ctx, method, path, url, req, res).then(done).catch((err: unknown) => {
+    void route(routeCtx, method, path, url, req, res).then(done).catch((err: unknown) => {
       if (err instanceof HttpError) {
         if (!res.headersSent) send(res, err.status, { error: err.code });
         return done(err.status);
@@ -156,7 +115,7 @@ export function createApiServer(ctx: Ctx): Server {
 }
 
 async function route(
-  ctx: Ctx,
+  ctx: Ctx & { analysis: AnalysisService },
   method: string,
   path: string,
   url: URL,
@@ -346,6 +305,10 @@ async function route(
     send(res, 202, { stored, quarantined, duplicates, invalid: invalidDetail.length, invalidDetail });
     return 202;
   }
+
+  // Analysis, findings and rule configuration (Phase 8).
+  const handled = await routeAnalysis(ctx, method, path, url, req, res);
+  if (handled !== undefined) return handled;
 
   send(res, 404, { error: "not_found" });
   return 404;

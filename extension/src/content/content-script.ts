@@ -16,6 +16,7 @@ import { RECORDING_FLAG_KEY, type CapturePayload, type RecordingFlag } from "../
 import { Debouncer } from "../recorder/debounce.ts";
 import { DomSummaryAccumulator, type MutationLike } from "../recorder/dom-summary.ts";
 import { buildSelector, describeElement, describeField, findInteractive, isSensitiveElement } from "./capture.ts";
+import { pageEnvironment } from "../common/environment.ts";
 
 const DOM_MAX_WAIT_MS = 5000;
 const OBSERVED_ATTRIBUTES = ["class", "hidden", "aria-hidden", "aria-expanded", "data-view", "disabled", "open"];
@@ -116,7 +117,9 @@ function attach(flag: RecordingFlag): void {
     attributeFilter: OBSERVED_ATTRIBUTES,
   });
   lastView = currentView();
-  capture("page_state", { metadata: { readyState: document.readyState, view: lastView ?? null } });
+  capture("page_state", {
+    metadata: { readyState: document.readyState, view: lastView ?? null, environment: pageEnvironment(window) },
+  });
 }
 
 function detach(): void {

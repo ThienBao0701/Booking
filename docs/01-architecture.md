@@ -1,11 +1,13 @@
 # 01 — Architecture
 
-Status: **v1.1** (Phases 0–7 implemented) · Scope: local, single-operator diagnostics lab.
+Status: **v1.1** (Phases 0–8 implemented) · Scope: local, single-operator diagnostics lab.
 
 This document is the source of truth for structure and boundaries. Any change
 to the boundaries below must be proposed as an ADR (see `docs/adr/`) before
 implementation. v1.1 changes are recorded in
-[ADR-0004](adr/0004-automation-engine-and-target-hardening.md).
+[ADR-0004](adr/0004-automation-engine-and-target-hardening.md); the analyzer
+(within the existing boundaries) in
+[ADR-0005](adr/0005-analyzer-rule-engine-and-findings.md).
 
 ## 1. Purpose
 
@@ -51,7 +53,8 @@ Local Background Service (windows-service/)                   [Phase 3]
    │                                   │
    ▼                                   ▼
 Analyzer · Dashboard · Reports   Mock Extranet (mock-extranet/)   [Phase 5]
-   [Phases 8–10, planned]         safe target; emits workflow events
+   [8: windows-service/src/analysis, 9–10 planned]
+                                  safe target; emits workflow events
 ```
 
 ### Record path (OBSERVE → RECORD)
@@ -73,13 +76,24 @@ Analyzer · Dashboard · Reports   Mock Extranet (mock-extranet/)   [Phase 5]
    target guard, and **only then** launches a `BrowserController`.
 3. Steps run with timeouts, retries, checkpoints; run records are persisted.
 
+### Analyze path (ANALYZE → COMPARE) — Phase 8
+
+1. On `session.end` (or `POST /v1/analysis/run`) the analyzer
+   (`windows-service/src/analysis`) segments the stored events into workflows,
+   computes timing, repeated sequences and the workflow graph, and evaluates
+   the JSON rule set against the session and its cohort.
+2. Each rule match becomes a validated, non-conclusive finding that cites the
+   exact triggering event ids; findings are persisted in `findings`.
+3. Comparison and graphs are computed on demand. Details:
+   [14-analysis](14-analysis.md), [ADR-0005](adr/0005-analyzer-rule-engine-and-findings.md).
+
 ## 3. Modules and ownership boundaries
 
 | Package            | Owns                                                        | May import        |
 |--------------------|------------------------------------------------------------|-------------------|
-| `shared`           | Contracts: event/recorder/workflow/replay schemas, **safety policy**, redaction, ids/time | (nothing internal) |
+| `shared`           | Contracts: event/recorder/workflow/replay/analysis schemas, **safety policy**, redaction, finding language guard, ids/time | (nothing internal) |
 | `extension`        | MV3 capture, redaction-at-source, recorder, bridge client  | `shared`          |
-| `windows-service`  | localhost API, event bus, SQLite, logs, watchdog, automation engine (controller host) | `shared` |
+| `windows-service`  | localhost API, event bus, SQLite, logs, watchdog, automation engine (controller host), analyzer + rule engine | `shared` |
 | `mock-extranet`    | Safe automation target that emits production-shaped events  | `shared`          |
 | `dashboard`        | Read/visualize; trigger authorized replays (planned)        | `shared`          |
 

@@ -1,0 +1,421 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "SEQ-RESERVATION-CANCELLATION",
+      "version": 1,
+      "category": "EVENT_SEQUENCE",
+      "severity": "info",
+      "title": "Reservation followed by cancellation within {{within_s}} s",
+      "description": "A reservation workflow was followed by a cancellation in the same tab after {{duration_s}} s (events seq {{first_seq}}–{{last_seq}}).",
+      "possible_explanation": "Commonly a deliberate test step, the correction of a mistaken reservation, or part of a scripted replay.",
+      "recommended_next_test": "Replay the RESERVATION → CANCELLATION segment on the mock (draft: GET /v1/sessions/{{session_id}}/workflow) with a longer pause between the two steps and compare the recorded sequences.",
+      "counter_evidence": [
+        "Creating and cancelling test reservations is an expected activity in the mock environment."
+      ],
+      "confidence": 0.8,
+      "when": {
+        "type": "sequence",
+        "steps": [
+          {
+            "kind": "WORKFLOW_TRANSITION",
+            "workflow": "RESERVATION"
+          },
+          {
+            "kind": "WORKFLOW_TRANSITION",
+            "workflow": "CANCELLATION"
+          }
+        ],
+        "within_ms": 120000,
+        "same_tab": true
+      }
+    },
+    {
+      "id": "SEQ-RATE-BEFORE-RESERVATION",
+      "version": 1,
+      "category": "EVENT_SEQUENCE",
+      "severity": "info",
+      "title": "Rate change shortly before a reservation",
+      "description": "A rate-setup workflow was followed by a reservation workflow after {{duration_s}} s (events seq {{first_seq}}–{{last_seq}}).",
+      "possible_explanation": "Rates are often adjusted right before testing a booking flow; the two steps may simply be part of one test plan.",
+      "recommended_next_test": "Replay the reservation with and without the preceding rate change on the mock and compare the reservation totals and timings.",
+      "confidence": 0.7,
+      "when": {
+        "type": "sequence",
+        "steps": [
+          {
+            "kind": "WORKFLOW_TRANSITION",
+            "workflow": "RATE_SETUP"
+          },
+          {
+            "kind": "WORKFLOW_TRANSITION",
+            "workflow": "RESERVATION"
+          }
+        ],
+        "within_ms": 300000
+      }
+    },
+    {
+      "id": "REP-SAME-CONTROL-BURST",
+      "version": 1,
+      "category": "REPETITION",
+      "severity": "info",
+      "title": "Same control activated {{count}} times in {{duration_s}} s",
+      "description": "The control {{pattern}} was activated {{count}} times in a row within {{within_s}} s.",
+      "possible_explanation": "Repeated activation often means the page gave no visible feedback, a double submit, or an intentional retry.",
+      "recommended_next_test": "Replay the step once on the mock with a waitFor on the expected confirmation element and measure the time until it appears.",
+      "counter_evidence": [
+        "Some controls (pagination, +/- steppers) are designed to be pressed repeatedly."
+      ],
+      "confidence": 0.75,
+      "when": {
+        "type": "repetition",
+        "match": {
+          "action": [
+            "click",
+            "submit"
+          ]
+        },
+        "min_count": 3,
+        "within_ms": 5000,
+        "consecutive": true
+      }
+    },
+    {
+      "id": "REP-ACTION-SEQUENCE",
+      "version": 1,
+      "category": "REPETITION",
+      "severity": "info",
+      "title": "Action sequence repeated {{count}} times",
+      "description": "A sequence of {{length}} operator actions recurred {{count}} times: {{pattern}}.",
+      "possible_explanation": "Typical of batch data entry, a retry loop after an unexpected result, or a replayed script.",
+      "recommended_next_test": "Compare the timing of each repetition in the Timeline view, then replay one iteration on the mock and check whether its outcome differs from the others.",
+      "confidence": 0.7,
+      "when": {
+        "type": "repeated_sequence",
+        "min_length": 3,
+        "max_length": 6,
+        "min_count": 3
+      }
+    },
+    {
+      "id": "GAP-LONG-IDLE",
+      "version": 1,
+      "category": "TIMING",
+      "severity": "info",
+      "title": "Idle period of {{gap_s}} s",
+      "description": "No events were recorded for {{gap_s}} s (threshold {{threshold_s}} s) between seq {{first_seq}} and {{last_seq}}.",
+      "possible_explanation": "The operator paused, switched to another application, or worked in a tab outside the recordable scope.",
+      "recommended_next_test": "Check whether the workflow continued in another tab; re-run the same workflow without the pause on the mock and compare the recorded sequences.",
+      "confidence": 0.85,
+      "when": {
+        "type": "gap",
+        "min_ms": 300000
+      }
+    },
+    {
+      "id": "ABS-NO-PAGE-UPDATE",
+      "version": 1,
+      "category": "DOM_CHANGE",
+      "severity": "info",
+      "title": "No page update observed after an action",
+      "description": "No page change ({{expected}}) was recorded within {{within_s}} s after {{pattern}}.",
+      "possible_explanation": "The action may have had no visible effect, the page may update outside the observed attributes, or the response was slower than the window.",
+      "recommended_next_test": "Replay the action on the mock with waitFor on the expected confirmation element and a 10 s timeout; compare with the recorded timing.",
+      "counter_evidence": [
+        "DOM observation covers structure and selected attributes only; text-only updates are not recorded."
+      ],
+      "confidence": 0.55,
+      "when": {
+        "type": "absence",
+        "after": {
+          "kind": "CLICK",
+          "target": "submit|save|create|add|send|generate|upload"
+        },
+        "expect": {
+          "kind": [
+            "DOM_CHANGE",
+            "PAGE_STATE",
+            "NAVIGATION"
+          ]
+        },
+        "within_ms": 5000
+      }
+    },
+    {
+      "id": "DUR-WORKFLOW-SHORT",
+      "version": 1,
+      "category": "TIMING",
+      "severity": "info",
+      "title": "{{workflow}} completed in {{duration_s}} s",
+      "description": "The {{workflow}} segment with {{count}} events lasted {{duration_s}} s (below {{threshold_s}} s).",
+      "possible_explanation": "Very short segments are typical of prepared test data, browser autofill, or a replayed workflow.",
+      "recommended_next_test": "Open the Compare view for this workflow across sessions; replay it on the mock at a manual pace and compare durations.",
+      "confidence": 0.6,
+      "when": {
+        "type": "duration",
+        "workflow": [
+          "PROPERTY_SETUP",
+          "ROOM_SETUP",
+          "RATE_SETUP",
+          "RESERVATION"
+        ],
+        "min_ms": 1500,
+        "min_events": 4
+      }
+    },
+    {
+      "id": "DUR-WORKFLOW-LONG",
+      "version": 1,
+      "category": "TIMING",
+      "severity": "info",
+      "title": "{{workflow}} lasted {{duration_s}} s",
+      "description": "The {{workflow}} segment lasted {{duration_s}} s (above {{threshold_s}} s).",
+      "possible_explanation": "Long segments often include reading, waiting for other people, or leaving the page open while doing something else.",
+      "recommended_next_test": "Inspect the idle gaps inside this segment in the Timeline view; replay the segment on the mock without pauses and compare step timings.",
+      "confidence": 0.8,
+      "when": {
+        "type": "duration",
+        "max_ms": 600000
+      }
+    },
+    {
+      "id": "CNT-ERROR-EVENTS",
+      "version": 1,
+      "category": "ERROR",
+      "severity": "warn",
+      "title": "{{count}} error event(s) recorded",
+      "description": "The recording contains {{count}} event(s) with severity error.",
+      "possible_explanation": "Page or extension errors; they may also affect what the recording captured around them.",
+      "recommended_next_test": "Open each error in the event drawer, then reproduce the workflow on the mock and check whether the same error recurs at the same step.",
+      "confidence": 0.9,
+      "when": {
+        "type": "count",
+        "match": {
+          "severity": "error"
+        },
+        "min": 1
+      }
+    },
+    {
+      "id": "RATE-ACTION-BURST",
+      "version": 1,
+      "category": "TIMING",
+      "severity": "info",
+      "title": "{{count}} operator actions within {{window_s}} s",
+      "description": "{{count}} clicks or field changes were recorded within {{window_s}} s.",
+      "possible_explanation": "Fast data entry, browser autofill filling several fields at once, or a replayed script.",
+      "recommended_next_test": "Check in the event drawer which fields were involved; enter the same data manually on the mock and compare the action rate.",
+      "counter_evidence": [
+        "Autofill of address or login forms routinely produces several field changes within a second."
+      ],
+      "confidence": 0.65,
+      "when": {
+        "type": "rate",
+        "match": {
+          "action": [
+            "click",
+            "change"
+          ]
+        },
+        "window_ms": 2000,
+        "min_count": 8
+      }
+    },
+    {
+      "id": "RATE-DOM-CHURN",
+      "version": 1,
+      "category": "DOM_CHANGE",
+      "severity": "info",
+      "title": "High page-update rate ({{count}} summaries in {{window_s}} s)",
+      "description": "{{count}} DOM-change summaries were recorded within {{window_s}} s.",
+      "possible_explanation": "Live-updating widgets, polling feeds, animations or repeated re-rendering.",
+      "recommended_next_test": "Open the DOM-change events to see which selectors changed most; compare with the same view in another session.",
+      "confidence": 0.6,
+      "when": {
+        "type": "rate",
+        "match": {
+          "kind": "DOM_CHANGE"
+        },
+        "window_ms": 5000,
+        "min_count": 8
+      }
+    },
+    {
+      "id": "OUT-PAUSE",
+      "version": 1,
+      "category": "ANOMALY",
+      "severity": "info",
+      "title": "Unusually long pause of {{gap_s}} s",
+      "description": "A pause of {{gap_s}} s is an outlier among this session's gaps (robust z = {{z}}).",
+      "possible_explanation": "An interruption, reading time, or waiting for a slow page; outliers are relative to this session only.",
+      "recommended_next_test": "Inspect the events around the pause in the Timeline view; replay the surrounding steps on the mock to see whether the page itself is slow at this step.",
+      "confidence": 0.6,
+      "when": {
+        "type": "outlier",
+        "metric": "inter_event_gap",
+        "z": 3.5,
+        "min_samples": 12,
+        "min_ms": 10000
+      }
+    },
+    {
+      "id": "OUT-WORKFLOW-DURATION",
+      "version": 1,
+      "category": "ANOMALY",
+      "severity": "info",
+      "title": "{{workflow}} duration differs from other sessions",
+      "description": "This {{workflow}} segment lasted {{duration_s}} s, an outlier against {{count}} segments of the same workflow in other sessions (robust z = {{z}}).",
+      "possible_explanation": "Different data, a different path through the workflow, or interruptions; the baseline sessions may not be comparable.",
+      "recommended_next_test": "Open the Compare view against a typical session and check which steps account for the difference.",
+      "confidence": 0.55,
+      "when": {
+        "type": "outlier",
+        "metric": "segment_duration",
+        "z": 3.5,
+        "min_samples": 4
+      }
+    },
+    {
+      "id": "NAV-LEFT-SCOPE",
+      "version": 1,
+      "category": "NAVIGATION",
+      "severity": "info",
+      "title": "Tab left the recordable scope {{count}} time(s)",
+      "description": "A recorded tab navigated to an origin outside the recordable scope {{count}} time(s); activity there is not recorded by design.",
+      "possible_explanation": "The operator followed an external link or opened another site in the same tab.",
+      "recommended_next_test": "If the workflow continued elsewhere and you are authorized to observe it, add that exact origin in the extension Options and record again.",
+      "confidence": 0.9,
+      "when": {
+        "type": "count",
+        "match": {
+          "action": "navigate",
+          "metadata": {
+            "leftScope": true
+          }
+        },
+        "min": 1
+      }
+    },
+    {
+      "id": "FORM-SENSITIVE-FIELD",
+      "version": 1,
+      "category": "FORM_ACTIVITY",
+      "severity": "info",
+      "title": "Sensitive fields used {{count}} time(s)",
+      "description": "{{count}} interaction(s) with password, one-time-code or payment fields were recorded structurally; their values were not read.",
+      "possible_explanation": "Login or payment steps are part of the workflow.",
+      "recommended_next_test": "When replaying, supply these fields as secret parameters at run time; they are never stored.",
+      "confidence": 0.9,
+      "when": {
+        "type": "count",
+        "match": {
+          "kind": "FORM_ACTIVITY",
+          "metadata": {
+            "sensitive": true
+          }
+        },
+        "min": 1
+      }
+    },
+    {
+      "id": "DQ-SEQ-GAP",
+      "version": 1,
+      "category": "DATA_QUALITY",
+      "severity": "info",
+      "title": "{{count}} gap(s) in the event sequence",
+      "description": "The sequence numbers of this session contain {{count}} gap(s).",
+      "possible_explanation": "A service-worker restart (sequence resumes 1000 higher by design), events still queued in the extension, or queue-overflow drops.",
+      "recommended_next_test": "Check the extension popup's queued and dropped counters, flush, and run the analysis again.",
+      "confidence": 0.9,
+      "when": {
+        "type": "data_quality",
+        "check": "seq_gap"
+      }
+    },
+    {
+      "id": "DQ-QUARANTINED",
+      "version": 1,
+      "category": "DATA_QUALITY",
+      "severity": "warn",
+      "title": "{{count}} event payload(s) quarantined",
+      "description": "{{count}} event payload(s) were replaced by the service because they still looked sensitive after redaction.",
+      "possible_explanation": "Recorded metadata contained an email, a long digit run or a large number (for example a timestamp inside metadata).",
+      "recommended_next_test": "Inspect which actions were quarantined in the event drawer and adjust what the recorder puts in metadata; record again.",
+      "confidence": 0.95,
+      "when": {
+        "type": "data_quality",
+        "check": "quarantined"
+      }
+    },
+    {
+      "id": "DQ-TS-REGRESSION",
+      "version": 1,
+      "category": "DATA_QUALITY",
+      "severity": "warn",
+      "title": "Timestamps moved backwards {{count}} time(s)",
+      "description": "Event timestamps decreased by more than 1 s while sequence numbers increased ({{count}} time(s)).",
+      "possible_explanation": "A system clock adjustment (manual change, time sync or time-zone change) during recording.",
+      "recommended_next_test": "Order by sequence number rather than time for this session; record again after confirming the system clock is stable.",
+      "confidence": 0.9,
+      "when": {
+        "type": "data_quality",
+        "check": "ts_regression"
+      }
+    },
+    {
+      "id": "DQ-UNTERMINATED",
+      "version": 1,
+      "category": "SESSION_CHANGE",
+      "severity": "info",
+      "title": "Session has no recorded end",
+      "description": "Neither a session_end event nor an end time was recorded for this session.",
+      "possible_explanation": "Recording is still running, the browser closed while recording, or the final events are still queued in the extension.",
+      "recommended_next_test": "Stop the recording from the popup (or flush it) and run the analysis again.",
+      "confidence": 0.8,
+      "when": {
+        "type": "data_quality",
+        "check": "unterminated"
+      }
+    },
+    {
+      "id": "CORR-TRANSITION-RECURS",
+      "version": 1,
+      "category": "CORRELATION",
+      "severity": "info",
+      "title": "{{count}} workflow transition(s) shared with other sessions",
+      "description": "Transitions in this session that also appear in at least half of the {{sessions_total}} analysed sessions: {{pattern}}.",
+      "possible_explanation": "Common paths through these workflows; co-occurrence across sessions describes the data set, not any outcome.",
+      "recommended_next_test": "Compare this session with one that lacks these transitions (Compare view) to see which steps differ.",
+      "confidence": 0.7,
+      "when": {
+        "type": "cross_session",
+        "pattern": "workflow_bigram",
+        "min_sessions": 3,
+        "min_share": 0.5,
+        "min_cohort": 3
+      }
+    },
+    {
+      "id": "CORR-RARE-TRANSITION",
+      "version": 1,
+      "category": "CORRELATION",
+      "severity": "info",
+      "title": "{{count}} transition(s) rare across analysed sessions",
+      "description": "Transitions in this session that appear in at most a quarter of the {{sessions_total}} analysed sessions: {{pattern}}.",
+      "possible_explanation": "This session took a path that other sessions rarely took: different test data, a different task, or an unusual detour.",
+      "recommended_next_test": "Open the Compare view against a typical session; replay the rare path on the mock to check whether it behaves like the common one.",
+      "counter_evidence": [
+        "Rarity depends on which sessions were analysed; a small or unrepresentative cohort makes ordinary paths look rare."
+      ],
+      "confidence": 0.6,
+      "when": {
+        "type": "cross_session",
+        "pattern": "workflow_bigram",
+        "min_sessions": 1,
+        "max_share": 0.25,
+        "min_cohort": 4
+      }
+    }
+  ]
+}

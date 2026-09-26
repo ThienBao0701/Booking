@@ -8,13 +8,28 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 import {
+  type Finding,
   type LabEvent,
   type SessionRecord,
   type RunRecord,
   redactValue,
   looksSensitive,
 } from "../shared.ts";
-import { ADDED_COLUMNS, DDL, PRAGMAS, SCHEMA_VERSION } from "./schema.ts";
+
+export interface FindingFilter {
+  sessionId?: string | undefined;
+  workflow?: string | undefined;
+  severity?: string | undefined;
+  ruleId?: string | undefined;
+  category?: string | undefined;
+  /** Case-insensitive substring over title, description and rule id. */
+  q?: string | undefined;
+  from?: number | undefined;
+  to?: number | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
+}
+import { ADDED_COLUMNS, ADDED_INDEXES, DDL, PRAGMAS, SCHEMA_VERSION } from "./schema.ts";
 
 export interface NewSession {
   id: string;
@@ -61,6 +76,7 @@ export class Store {
       const cols = this.#db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
       if (!cols.some((c) => c.name === column)) this.#db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
     }
+    for (const ddl of ADDED_INDEXES) this.#db.exec(ddl);
   }
 
   #setMeta(key: string, value: string): void {
@@ -289,6 +305,130 @@ export class Store {
         ...(s.error != null ? { error: s.error as string } : {}),
       })),
     };
+  }
+
+  // ---- findings (Component 6 table + Phase 8 columns) ----
+
+  /**
+   * Replace the findings of `sessionIds` with `findings` (one transaction):
+   * re-running analysis never leaves stale or duplicate findings.
+   */
+  saveFindings(sessionIds: readonly string[], findings: readonly Finding[]): void {
+    this.transaction(() => {
+      const del = this.#db.prepare("DELETE FROM findings WHERE session_id=?");
+      for (const id of sessionIds) del.run(id);
+      const ins = this.#db.prepare(
+        `INSERT OR REPLACE INTO findings(id, session_id, observed_pattern, evidence, frequency, context, possible_explanation,
+           first_ts, last_ts, workflow, event_ids, rule_id, category, severity, description, confidence,
+           counter_evidence, recommended_next_test, created_at)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      );
+      for (const f of findings) {
+        ins.run(
+          f.finding_id,
+          f.session_id,
+          f.title,
+          JSON.stringify(f.evidence),
+          f.frequency,
+          JSON.stringify(f.context),
+          f.possible_explanation,
+          f.timestamp_range.start,
+          f.timestamp_range.end,
+          f.workflow,
+          JSON.stringify(f.event_ids),
+          f.rule_id,
+          f.category,
+          f.severity,
+          f.description,
+          f.confidence,
+          JSON.stringify(f.counter_evidence),
+          f.recommended_next_test,
+          f.created_at,
+        );
+      }
+    });
+  }
+
+  #rowToFinding(r: Record<string, unknown>): Finding {
+    return {
+      finding_id: r.id as string,
+      session_id: r.session_id as string,
+      workflow: ((r.workflow as string | null) ?? "UNKNOWN") as Finding["workflow"],
+      event_ids: JSON.parse((r.event_ids as string | null) ?? "[]") as string[],
+      timestamp_range: { start: r.first_ts as number, end: r.last_ts as number },
+      rule_id: (r.rule_id as string | null) ?? "LEGACY",
+      category: ((r.category as string | null) ?? "EVENT_SEQUENCE") as Finding["category"],
+      severity: ((r.severity as string | null) ?? "info") as Finding["severity"],
+      title: r.observed_pattern as string,
+      description: (r.description as string | null) ?? (r.observed_pattern as string),
+      evidence: JSON.parse(r.evidence as string) as Finding["evidence"],
+      confidence: (r.confidence as number | null) ?? 0.5,
+      counter_evidence: JSON.parse((r.counter_evidence as string | null) ?? "[]") as string[],
+      recommended_next_test: (r.recommended_next_test as string | null) ?? "",
+      frequency: r.frequency as number,
+      context: JSON.parse(r.context as string) as Record<string, unknown>,
+      possible_explanation: r.possible_explanation as string,
+      created_at: (r.created_at as number | null) ?? (r.first_ts as number),
+    };
+  }
+
+  listFindings(filter: FindingFilter = {}): { total: number; findings: Finding[] } {
+    const where: string[] = [];
+    const args: Array<string | number> = [];
+    const eq = (col: string, v: string | undefined) => {
+      if (v) {
+        where.push(`${col} = ?`);
+        args.push(v);
+      }
+    };
+    eq("session_id", filter.sessionId);
+    eq("workflow", filter.workflow);
+    eq("severity", filter.severity);
+    eq("rule_id", filter.ruleId);
+    eq("category", filter.category);
+    if (filter.from !== undefined) {
+      where.push("last_ts >= ?");
+      args.push(filter.from);
+    }
+    if (filter.to !== undefined) {
+      where.push("first_ts <= ?");
+      args.push(filter.to);
+    }
+    if (filter.q) {
+      where.push("(lower(observed_pattern) LIKE ? OR lower(description) LIKE ? OR lower(rule_id) LIKE ?)");
+      const like = `%${filter.q.toLowerCase().replace(/[%_]/g, "")}%`;
+      args.push(like, like, like);
+    }
+    const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const total = (this.#db.prepare(`SELECT COUNT(*) AS n FROM findings ${clause}`).get(...args) as { n: number }).n;
+    const limit = Math.max(1, Math.min(500, filter.limit ?? 100));
+    const offset = Math.max(0, filter.offset ?? 0);
+    const rows = this.#db
+      .prepare(
+        `SELECT * FROM findings ${clause}
+         ORDER BY CASE severity WHEN 'error' THEN 0 WHEN 'warn' THEN 1 ELSE 2 END, first_ts DESC LIMIT ? OFFSET ?`,
+      )
+      .all(...args, limit, offset) as Array<Record<string, unknown>>;
+    return { total, findings: rows.map((r) => this.#rowToFinding(r)) };
+  }
+
+  getFinding(id: string): Finding | undefined {
+    const row = this.#db.prepare("SELECT * FROM findings WHERE id=?").get(id) as Record<string, unknown> | undefined;
+    return row ? this.#rowToFinding(row) : undefined;
+  }
+
+  /** Stored events by id (for finding drill-down / report evidence). */
+  getEventsByIds(ids: readonly string[]): StoredEventRow[] {
+    if (ids.length === 0) return [];
+    const out: StoredEventRow[] = [];
+    for (let i = 0; i < ids.length; i += 500) {
+      const chunk = ids.slice(i, i + 500);
+      const rows = this.#db
+        .prepare(`SELECT * FROM events WHERE id IN (${chunk.map(() => "?").join(",")}) ORDER BY session_id, seq`)
+        .all(...chunk) as unknown as StoredEventRow[];
+      out.push(...rows);
+    }
+    return out;
   }
 
   // ---- maintenance ----

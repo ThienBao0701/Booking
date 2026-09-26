@@ -20,6 +20,7 @@
 import { isRecordableUrl, originToMatchPattern, type ExtensionConfig } from "../common/config.ts";
 import { isContentMessage, isUiMessage, type ContentMessage, type UiMessage } from "../common/messages.ts";
 import { pagePath, urlHost } from "../common/paths.ts";
+import { browserEnvironment, type NavigatorLike } from "../common/environment.ts";
 import { BridgeClient, type BridgeState } from "../bridge/client.ts";
 import { Debouncer } from "../recorder/debounce.ts";
 import { Recorder } from "../recorder/recorder.ts";
@@ -195,6 +196,7 @@ async function onUi(msg: UiMessage): Promise<unknown> {
       const desc = c.recorder.startSession({
         mode: c.config.safetyMode,
         target: { kind: "observe", ...(host ? { host } : {}) },
+        environment: browserEnvironment(navigator as NavigatorLike, chrome.runtime.getManifest().version),
       });
       c.bridge.declareSession(desc);
       if (tab?.id !== undefined && host) track(c, tab.id);

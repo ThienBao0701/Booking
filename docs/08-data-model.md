@@ -6,7 +6,8 @@ tables are local; ids come from `shared/src/ids.ts`.
 ## Tables (implemented — `windows-service/src/db/schema.ts`)
 
 Status: `sessions`, `events`, `findings`, `runs`, `run_steps`, and `meta` are
-implemented and covered by tests. `runs`/`run_steps` are written by the replay
+implemented and covered by tests. `findings` is written by the analyzer
+(Phase 8). `runs`/`run_steps` are written by the replay
 engine (`Store.saveRun`, upsert after every change) and read by
 `GET /v1/runs/:id`. Ingestion is idempotent on `events.id` and
 `sessions.id`, and each batch is one transaction. `workflows`, `screenshots`
@@ -54,15 +55,41 @@ column migration (`ADDED_COLUMNS` in `schema.ts`); `SCHEMA_VERSION` changes
 only for breaking changes.
 
 ### `findings`
-Analyzer output (see `docs/02` categories). Non-conclusive by construction:
-each row has `observed_pattern`, `evidence`, `frequency`, `context`,
-`possible_explanation`, `first_ts`, `last_ts`.
+Analyzer output ([14-analysis](14-analysis.md), ADR-0005). Non-conclusive by
+construction.
+
+| column | type | notes |
+|---|---|---|
+| `id` | TEXT PK | `finding_id` (`fnd_…`, deterministic) |
+| `session_id` | TEXT FK → sessions (cascade) | |
+| `observed_pattern` | TEXT | finding `title` |
+| `evidence` | TEXT (JSON) | `EvidenceItem[]` |
+| `frequency` | INTEGER | matches of the rule in the session |
+| `context` | TEXT (JSON) | rule/rules version, cohort size, target kind… |
+| `possible_explanation` | TEXT | |
+| `first_ts`, `last_ts` | INTEGER | `timestamp_range` |
+| `workflow` | TEXT | *added in Phase 8* |
+| `event_ids` | TEXT (JSON) | *added* — exact triggering events |
+| `rule_id`, `category`, `severity` | TEXT | *added* |
+| `description` | TEXT | *added* |
+| `confidence` | REAL | *added* — 0.05..0.95 |
+| `counter_evidence` | TEXT (JSON) | *added* — platform caveat last |
+| `recommended_next_test` | TEXT | *added* |
+| `created_at` | INTEGER | *added* |
+
+Phase 8 columns are applied by the additive migration (`ADDED_COLUMNS`,
+indexes in `ADDED_INDEXES`: `rule_id`, `severity`, `first_ts`); the schema
+version stays 1. Re-analysing a session replaces its findings in one
+transaction.
 
 ### `screenshots`
 | `id` | `session_id` | `event_id` | `path` | `sha256` | `trigger_action` | `ts` |
 
-### `environment_reports`
+### `environment_reports` (derived — not a table)
 Per-session environment snapshot (Component 8) for cross-session comparison.
+Computed on demand from the events that carry the facts
+(`session_start` / first `page_state` `metadata.environment`), each value
+citing its source event (ADR-0005). No separate table is stored.
 
 ## IndexedDB (extension side)
 

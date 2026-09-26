@@ -42,3 +42,8 @@ export * from "./workflow/types.ts";
 export { validateSessionRecord } from "./workflow/validate.ts";
 export * from "./replay/types.ts";
 export { validateWorkflowFile, authorizeRun } from "./replay/validate.ts";
+
+// Analysis (Phase 8): findings, rule schema, analyzer outputs, language guard.
+export * from "./analysis/types.ts";
+export * from "./analysis/language.ts";
+export { validateRule, validateRuleSet, validateFinding } from "./analysis/validate.ts";

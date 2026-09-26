@@ -16,6 +16,7 @@ import { Logger } from "./logger.ts";
 import { RateLimiter } from "./security.ts";
 import { createApiServer } from "./server.ts";
 import { isMainModule } from "./main-module.ts";
+import { AnalysisService } from "./analysis/service.ts";
 
 function ensureToken(dataDir: string, fromEnv: string | undefined): string {
   if (fromEnv && fromEnv.length >= 16) return fromEnv;
@@ -29,6 +30,37 @@ function ensureToken(dataDir: string, fromEnv: string | undefined): string {
     /* best effort on platforms without POSIX perms */
   }
   return token;
+}
+
+/**
+ * Analyse a session once it ends (findings persisted, replacing earlier ones).
+ * Deferred off the request path and coalesced; failures are logged, never thrown.
+ */
+export function autoAnalyzeOnSessionEnd(bus: EventBus, analysis: AnalysisService, logger: Logger): () => void {
+  const pending = new Set<string>();
+  let timer: NodeJS.Timeout | undefined;
+  const flush = () => {
+    timer = undefined;
+    const ids = [...pending];
+    pending.clear();
+    try {
+      const summary = analysis.run(ids);
+      logger.info("analysis_run", { trigger: "session.end", sessions: summary.sessions, findings: summary.findings, rules_version: summary.rules_version });
+    } catch (err) {
+      logger.error("analysis_failed", { sessions: ids, error: String(err) });
+    }
+  };
+  const unsubscribe = bus.subscribe((msg) => {
+    if (msg.type !== "session.end") return;
+    pending.add(msg.payload.sessionId);
+    // Late events of the final bridge batch may still be in flight; wait briefly.
+    timer ??= setTimeout(flush, 1500);
+    timer.unref?.();
+  });
+  return () => {
+    unsubscribe();
+    if (timer) clearTimeout(timer);
+  };
 }
 
 export interface StartedService {
@@ -52,7 +84,11 @@ export function startService(env: ConfigEnv = process.env as ConfigEnv): Promise
   const sweep = setInterval(() => limiter.sweep(), 30_000);
   sweep.unref?.();
 
-  const server = createApiServer({ config, store, bus, logger, limiter });
+  const analysis = new AnalysisService({ store, dataDir: config.dataDir });
+  if (analysis.rulesInfo().error) logger.warn("analysis_rules", { error: analysis.rulesInfo().error });
+  const stopAutoAnalysis = autoAnalyzeOnSessionEnd(bus, analysis, logger);
+
+  const server = createApiServer({ config, store, bus, logger, limiter, analysis });
   // Bound slow/stalled clients so a hung bridge connection cannot pin the service.
   server.headersTimeout = 10_000;
   server.requestTimeout = 15_000;
@@ -67,6 +103,7 @@ export function startService(env: ConfigEnv = process.env as ConfigEnv): Promise
       const close = () =>
         new Promise<void>((done) => {
           clearInterval(sweep);
+          stopAutoAnalysis();
           server.close(() => {
             store.close();
             logger.info("service_stopped", {});

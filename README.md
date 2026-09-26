@@ -39,10 +39,11 @@ account.
 | 5 | Mock Extranet (safe automation target) | ✅ |
 | 6 | BrowserController interface + mock controller | ✅ |
 | 7 | Replay engine (start/pause/resume/stop/step/retry/checkpoint/rollback/dryRun) + recording → workflow + CLI | ✅ |
-| 8–10 | Analyzer · dashboard · reports | ⬜ next |
+| 8 | Analyzer: segmentation, timing, sequences, anomalies, comparison, correlation, graph, evidence + JSON rule engine | ✅ |
+| 9–10 | Dashboard · forensic reports | ⬜ next |
 | 11–15 | Security hardening · packaging · Windows installer | ⬜ (CI, lint, tests in place) |
 
-**Tests:** 201 unit · 13 E2E on the mock at 127.0.0.1:4599 · 2 real-browser
+**Tests:** 254 unit · 13 E2E on the mock at 127.0.0.1:4599 · 2 real-browser
 (built extension in Chromium). Lint, typecheck (6 configs) and the verified
 extension build run in CI. See [docs/10-testing.md](docs/10-testing.md).
 
@@ -67,7 +68,8 @@ pnpm run replay:example          # replay all ten mock modules (SIMULATE mode)
 Chrome ── MV3 extension ── bridge (loopback, token) ──► local service ──► SQLite
              records your                                   │
              own session                                    ├─► recording → workflow draft
-             (redacted)                                     └─► ReplayEngine ─(authorized?)─► BrowserController ─► mock Extranet
+             (redacted)                                     ├─► ReplayEngine ─(authorized?)─► BrowserController ─► mock Extranet
+                                                            └─► Analyzer (JSON rules) ─► findings → exact event ids
 ```
 
 Full detail: [docs/01-architecture.md](docs/01-architecture.md) (v1.1) and
@@ -78,7 +80,8 @@ Full detail: [docs/01-architecture.md](docs/01-architecture.md) (v1.1) and
 ```
 shared/            contracts: event / recorder / workflow / replay schema, safety policy, redaction
 extension/         MV3 recorder: service worker, content script, recorder, bridge, popup, options
-windows-service/   loopback API, event bus, SQLite, watchdog; src/automation: controller, replay engine, CLI
+windows-service/   loopback API, event bus, SQLite, watchdog; src/automation: controller, replay engine, CLI;
+                   src/analysis: analyzer + JSON rule engine
 mock-extranet/     safe local Extranet (login, property, rooms, rates, reservations, messages, reviews, photos, reports)
 dashboard/         (Phase 9)
 examples/          runnable workflow files
@@ -104,6 +107,7 @@ docs/              source-of-truth documentation + ADRs
 | Installation | [11-installation](docs/11-installation.md) |
 | Chrome extension setup | [12-chrome-extension-setup](docs/12-chrome-extension-setup.md) |
 | Windows service setup | [13-windows-service-setup](docs/13-windows-service-setup.md) |
+| Workflow analysis, rules, findings | [14-analysis](docs/14-analysis.md) |
 | ADRs | [docs/adr](docs/adr/) |
 
 ## Safety modes

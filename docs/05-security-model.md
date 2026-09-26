@@ -41,6 +41,12 @@ All service endpoints:
    (duplicates reported, not re-stored), so client retries are always safe.
 9. **Structured logging** — every request logged as JSON (method, route,
    status, latency) to rolling logs; tokens are never logged.
+10. **Analysis routes** (Phase 8) use the same pipeline. Query parameters are
+   validated (enums, integers, id charset, ≤ 200 session ids per request).
+   `PUT /v1/analysis/rules` validates the rule set fail-closed (including the
+   non-conclusive language guard and a 200-character regex cap) before an
+   atomic write of `analysis-rules.json` (mode 0600); an invalid file on disk
+   is ignored in favour of the built-in rules.
 
 ## Extension (Component 13)
 

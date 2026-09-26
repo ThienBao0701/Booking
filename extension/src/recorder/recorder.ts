@@ -213,6 +213,8 @@ export class Recorder {
     target: { kind: string; host?: string };
     sessionId?: string;
     startedAt?: number;
+    /** Read-only diagnostic environment facts (common/environment.ts). */
+    environment?: Record<string, unknown>;
   }): SessionDescriptor {
     if (this.#session) throw new Error(`session ${this.#session.sessionId} is already active`);
     const desc: SessionDescriptor = {
@@ -226,7 +228,15 @@ export class Recorder {
     this.#lastWorkflow.clear();
     this.#stats.recording = true;
     this.#stats.sessionId = desc.sessionId;
-    this.record({ action: "session_start", page: "/", metadata: { mode: desc.mode, targetKind: desc.target.kind } });
+    this.record({
+      action: "session_start",
+      page: "/",
+      metadata: {
+        mode: desc.mode,
+        targetKind: desc.target.kind,
+        ...(opts.environment ? { environment: opts.environment } : {}),
+      },
+    });
     return desc;
   }
 

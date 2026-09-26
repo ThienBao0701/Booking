@@ -5,7 +5,7 @@
 | Suite | Where | Command | Install needed |
 |---|---|---|---|
 | Unit — shared contracts, safety, redaction | `shared/test` | `pnpm run test:shared` | no |
-| Unit + integration — service (auth, security, store, ingestion, watchdog, controller, replay engine, converter, routes) | `windows-service/test` | `pnpm run test:service` | no |
+| Unit + integration — service (auth, security, store, ingestion, watchdog, controller, replay engine, converter, routes, analyzer, rule engine, comparison, analysis API) | `windows-service/test` | `pnpm run test:service` | no |
 | Unit + integration — mock Extranet | `mock-extranet/test` | `pnpm run test:mock` | no |
 | Unit — extension (recorder, bridge, capture, config, manifest policy) | `extension/test` | `pnpm run test:extension` | no |
 | E2E — bridge, controller, replay on the mock at 127.0.0.1:4599 | `tests/e2e` | `pnpm run test:e2e` | no |
@@ -13,9 +13,9 @@
 
 `pnpm run test` = unit + E2E. `pnpm run verify` = lint + typecheck + test + build.
 
-Counts at this revision: **201 unit** (54 shared · 77 service · 11 mock ·
-59 extension), **13 E2E**, **2 real-browser**. The original 75 tests are
-unchanged and still pass.
+Counts at this revision: **254 unit** (62 shared · 119 service · 11 mock ·
+62 extension), **13 E2E**, **2 real-browser**. Earlier tests are unchanged and
+still pass.
 
 ## What the E2E suites prove
 
@@ -32,6 +32,27 @@ unchanged and still pass.
 - **Browser (2):** the built extension in Chromium records real clicks/typing;
   no typed value or secret reaches the service; REC badge; session ends; the
   recording replays; a tampered off-box service URL is refused.
+
+## What the analysis suites prove (Phase 8)
+
+- **Contracts (shared):** the language guard accepts neutral diagnostic wording
+  and rejects proof / enforcement / sanction / platform-detection / causation
+  claims; rule sets fail closed; findings without traceable events are invalid.
+- **Rule engine:** every condition type on purpose-built sessions, including
+  negative cases (window not observed → no judgement, floors, min samples,
+  cohort size).
+- **Analyzer:** segmentation, timing, repeated sequences, graph and
+  environment against fixtures; on a mixed cohort **every** finding passes
+  `validateFinding`, cites existing events, has trigger evidence equal to
+  `event_ids`, ends with the platform caveat and contains no conclusive
+  wording; normal sessions produce low-noise, info-only output; results are
+  deterministic.
+- **Comparison:** LCS, pacing vs. path differences, environment diffs, notes.
+- **Service/API:** persistence is idempotent; custom rules persist, survive
+  restart and fall back to defaults when invalid; a pre-Phase-8 database
+  migrates additively; every finding's event ids resolve over
+  `GET /v1/findings/:id`; auth/origin/validation on every analysis route;
+  auto-analysis on session end is deferred and coalesced.
 
 ## The mock at 127.0.0.1:4599
 

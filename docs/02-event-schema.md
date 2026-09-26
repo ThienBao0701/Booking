@@ -153,3 +153,7 @@ Example (a click in the mock's reservations view):
   (session/transition events excluded); dedup happens before `seq` assignment.
 - **Workflow transitions:** a `workflow_transition` event (`metadata.from/to`)
   precedes the first event of a new workflow in a tab.
+- **Environment facts (optional):** `session_start.metadata.environment` and
+  the first `page_state.metadata.environment` of a tab carry read-only
+  diagnostic facts ([06-privacy-model](06-privacy-model.md#environment--fingerprint-report-component-8));
+  the analyzer's environment report cites these events.

@@ -48,6 +48,10 @@ and provably applied.
 ## Environment / fingerprint report (Component 8)
 
 The environment report contains only values a page can already observe about
-itself (browser version, platform, language, timezone, viewport, extension
-version, session duration). It is a **comparison** artifact across sessions. The
-tool never spoofs or alters any of these values.
+itself (browser family + major version, platform, language, timezone,
+hardware concurrency, viewport, screen size, pixel ratio, colour scheme,
+extension version, session duration). It is a **comparison** artifact across
+sessions. The full user-agent string is not recorded, and there is no canvas,
+audio, WebGL or font probing. The tool never spoofs or alters any of these
+values. Browser facts ride on `session_start`, page facts on the first
+`page_state` of a tab (`metadata.environment`).

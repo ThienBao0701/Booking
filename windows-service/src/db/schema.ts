@@ -22,6 +22,24 @@ export const SCHEMA_VERSION = 1;
  */
 export const ADDED_COLUMNS: ReadonlyArray<[string, string, string]> = [
   ["runs", "target", "TEXT"], // target + authorization record per run (traceability)
+  // Phase 8: the Component 6 findings table gains the analyzer's finding fields.
+  ["findings", "workflow", "TEXT"],
+  ["findings", "event_ids", "TEXT NOT NULL DEFAULT '[]'"],
+  ["findings", "rule_id", "TEXT"],
+  ["findings", "category", "TEXT"],
+  ["findings", "severity", "TEXT"],
+  ["findings", "description", "TEXT"],
+  ["findings", "confidence", "REAL"],
+  ["findings", "counter_evidence", "TEXT NOT NULL DEFAULT '[]'"],
+  ["findings", "recommended_next_test", "TEXT"],
+  ["findings", "created_at", "INTEGER"],
+];
+
+/** Indexes over migrated columns (created after ADDED_COLUMNS are applied). */
+export const ADDED_INDEXES: readonly string[] = [
+  "CREATE INDEX IF NOT EXISTS idx_findings_rule ON findings(rule_id)",
+  "CREATE INDEX IF NOT EXISTS idx_findings_severity ON findings(severity)",
+  "CREATE INDEX IF NOT EXISTS idx_findings_first_ts ON findings(first_ts)",
 ];
 
 export const DDL = `
