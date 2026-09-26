@@ -1,0 +1,6 @@
+packages:
+  - "shared"
+  - "windows-service"
+  - "mock-extranet"
+  - "dashboard"
+  - "extension"

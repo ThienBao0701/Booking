@@ -1,0 +1,23 @@
+{
+  "name": "@lab/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-component contracts: event/workflow/replay schemas, safety policy, redaction. Zero runtime dependencies.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./safety": "./src/safety/policy.ts",
+    "./redaction": "./src/redaction/redact.ts",
+    "./events": "./src/events/validate.ts",
+    "./workflow": "./src/workflow/validate.ts",
+    "./replay": "./src/replay/validate.ts"
+  },
+  "scripts": {
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

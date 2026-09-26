@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Runtime / data (local-only, never committed)
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+data/
+logs/
+*.log
+screenshots/
+.lab-runtime/
+
+# Secrets / local config (auth tokens live here, never in git)
+.env
+.env.*
+!.env.example
+lab.local.json
+auth-token.txt
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Test / coverage
+coverage/
+.nyc_output/

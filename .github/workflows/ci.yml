@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shared:
+    name: shared (contracts + safety core)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # The shared package is intentionally zero-runtime-dependency and is
+      # tested via Node's built-in runner with TypeScript type-stripping, so
+      # this job needs no network install and always runs.
+      - name: Unit test — shared
+        run: node --test --experimental-strip-types shared/test/*.test.ts
+
+  workspaces:
+    name: build / typecheck / lint (workspaces)
+    runs-on: ubuntu-latest
+    continue-on-error: true # phases beyond 0 land incrementally
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+      - name: Install
+        run: pnpm install --frozen-lockfile || pnpm install
+      - name: Typecheck
+        run: pnpm -r --if-present typecheck
+      - name: Lint
+        run: pnpm -r --if-present lint
+      - name: Test
+        run: pnpm -r --if-present test
+      - name: Build
+        run: pnpm -r --if-present build
