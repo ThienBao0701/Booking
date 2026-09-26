@@ -50,3 +50,6 @@ export { validateRule, validateRuleSet, validateFinding } from "./analysis/valid
 
 // Read-API response contracts (service ↔ dashboard, ADR-0006).
 export * from "./api/types.ts";
+
+// Forensic report contract (Phase 10).
+export * from "./reports/types.ts";

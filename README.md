@@ -41,11 +41,12 @@ account.
 | 7 | Replay engine (start/pause/resume/stop/step/retry/checkpoint/rollback/dryRun) + recording → workflow + CLI | ✅ |
 | 8 | Analyzer: segmentation, timing, sequences, anomalies, comparison, correlation, graph, evidence + JSON rule engine | ✅ |
 | 9 | Forensic dashboard at `/dashboard/`: overview, sessions + compare, timeline, workflow graph, events, findings drill-down, environment, runs, screenshots, settings | ✅ |
-| 10 | Forensic reports | ⬜ next |
+| 10 | Forensic reports: JSON · CSV (findings / events / evidence) · HTML · print-ready HTML, 11 sections, every finding linked to its exact event ids; API, CLI, dashboard | ✅ |
 | 11–15 | Security hardening · packaging · Windows installer | ⬜ (CI, lint, tests in place) |
 
-**Tests:** 275 unit · 13 E2E on the mock at 127.0.0.1:4599 · 10 real-browser
-(built extension and dashboard in Chromium). Lint, typecheck (6 configs) and the verified
+**Tests:** 284 unit · 14 E2E on the mock at 127.0.0.1:4599 (incl. the full
+OBSERVE → RECORD → REPLAY → ANALYZE → COMPARE → REPORT pipeline) · 11
+real-browser (built extension and dashboard in Chromium). Lint, typecheck (6 configs) and the verified
 extension build run in CI. See [docs/10-testing.md](docs/10-testing.md).
 
 ## Quick start
@@ -62,6 +63,7 @@ pnpm run build                   # extension/dist (load unpacked, paste the toke
 pnpm run dashboard:url           # → http://127.0.0.1:4577/dashboard/#token=…  (forensic dashboard)
 
 pnpm run replay:example          # replay all ten mock modules (SIMULATE mode)
+pnpm run report <sessionId> --format html --out report.html   # forensic report (also JSON / CSV / print)
 ```
 
 ## How it fits together
@@ -72,6 +74,7 @@ Chrome ── MV3 extension ── bridge (loopback, token) ──► local serv
              own session                                    ├─► recording → workflow draft
              (redacted)                                     ├─► ReplayEngine ─(authorized?)─► BrowserController ─► mock Extranet
                                                             └─► Analyzer (JSON rules) ─► findings → exact event ids
+                                                                   └─► Dashboard (/dashboard/) · Reports (JSON/CSV/HTML/print)
 ```
 
 Full detail: [docs/01-architecture.md](docs/01-architecture.md) (v1.1) and
@@ -83,7 +86,7 @@ Full detail: [docs/01-architecture.md](docs/01-architecture.md) (v1.1) and
 shared/            contracts: event / recorder / workflow / replay schema, safety policy, redaction
 extension/         MV3 recorder: service worker, content script, recorder, bridge, popup, options
 windows-service/   loopback API, event bus, SQLite, watchdog; src/automation: controller, replay engine, CLI;
-                   src/analysis: analyzer + JSON rule engine
+                   src/analysis: analyzer + JSON rule engine; src/reports: forensic reports + CLI
 mock-extranet/     safe local Extranet (login, property, rooms, rates, reservations, messages, reviews, photos, reports)
 dashboard/         forensic dashboard (static SPA served by the service at /dashboard/)
 examples/          runnable workflow files
@@ -111,6 +114,7 @@ docs/              source-of-truth documentation + ADRs
 | Windows service setup | [13-windows-service-setup](docs/13-windows-service-setup.md) |
 | Workflow analysis, rules, findings | [14-analysis](docs/14-analysis.md) |
 | Forensic dashboard | [15-dashboard](docs/15-dashboard.md) |
+| Forensic reports | [16-reports](docs/16-reports.md) |
 | ADRs | [docs/adr](docs/adr/) |
 
 ## Safety modes

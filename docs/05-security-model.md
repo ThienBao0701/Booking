@@ -52,7 +52,14 @@ All service endpoints:
    directory. Every data request still needs the bearer token. The token
    reaches the page via the URL fragment (never sent to a server) and lives in
    `sessionStorage`; no cookies, so CSRF remains impossible.
-11. **Analysis routes** (Phase 8) use the same pipeline. Query parameters are
+11. **Reports** (Phase 10) — `GET /v1/reports/sessions/:id` needs the token
+   like every data route. HTML reports contain no scripts and carry a CSP that
+   allows only their own stylesheet (by hash), both as a header and as a
+   `<meta>` tag so saved files keep it; all recorded strings are escaped by
+   construction. CSV cells that a spreadsheet would evaluate (`= + - @` TAB CR)
+   are prefixed with `'`. The CLI reads the local database file directly and
+   writes output with mode 0600.
+12. **Analysis routes** (Phase 8) use the same pipeline. Query parameters are
    validated (enums, integers, id charset, ≤ 200 session ids per request).
    `PUT /v1/analysis/rules` validates the rule set fail-closed (including the
    non-conclusive language guard and a 200-character regex cap) before an

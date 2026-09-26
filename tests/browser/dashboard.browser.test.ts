@@ -9,7 +9,7 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -108,6 +108,7 @@ test("every page renders without errors", { skip }, async () => {
     [`#/runs/${seeded.runId}`, "table.data tbody tr"],
     ["#/screenshots", "table.data tbody tr"],
     ["#/reports", "main h1"],
+    ["#/reports?session=dash-odd", "[data-download]"],
     ["#/settings", "textarea.rules-editor"],
     ["#/compare?a=dash-n0&b=dash-odd", ".hero-value"],
   ];
@@ -185,5 +186,33 @@ test("session comparison shows similarity, per-workflow deltas and environment d
   assert.match(text, /similarity/);
   assert.match(text, /Time per workflow/);
   assert.match(text, /Environment differences/);
+  assert.deepEqual(problems, []);
+});
+
+test("reports page: summary, downloads in every format, styled script-free preview", { skip }, async () => {
+  await go("#/reports?session=dash-odd", "[data-download]");
+  const main = (await page.textContent("main")) ?? "";
+  assert.match(main, /Executive summary/);
+  assert.match(main, /Comparative Analysis/);
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.click('[data-download="json"]')]);
+  assert.match(dl.suggestedFilename(), /^lab-report_dash-odd_\d{8}\.json$/);
+  const report = JSON.parse(readFileSync((await dl.path()) as string, "utf8")) as { session: { session_id: string }; findings: Array<{ event_ids: string[] }>; timeline: { events: Array<{ event_id: string }> } };
+  assert.equal(report.session.session_id, "dash-odd");
+  const rows = new Set(report.timeline.events.map((e) => e.event_id));
+  for (const f of report.findings) for (const id of f.event_ids) assert.ok(rows.has(id), id);
+  const [csv] = await Promise.all([page.waitForEvent("download"), page.click('[data-download="csv-evidence"]')]);
+  assert.match(readFileSync((await csv.path()) as string, "utf8"), /^\uFEFF"finding_id","rule_id","role","event_id"/);
+  const [html] = await Promise.all([page.waitForEvent("download"), page.click('[data-download="print"]')]);
+  assert.match(readFileSync((await html.path()) as string, "utf8"), /<body class="print">/);
+
+  const popupProblems: string[] = [];
+  const [popup] = await Promise.all([page.context().waitForEvent("page"), page.click('[data-preview="html"]')]);
+  popup.on("console", (m) => popupProblems.push(`${m.type()}: ${m.text()}`));
+  await popup.waitForSelector("h1");
+  assert.match((await popup.textContent("h1")) ?? "", /Forensic report — session dash-odd/);
+  assert.match(await popup.evaluate(() => getComputedStyle(document.body).fontFamily), /system-ui/, "report stylesheet applied under CSP");
+  assert.equal(await popup.evaluate(() => document.scripts.length), 0);
+  await popup.close();
+  assert.deepEqual(popupProblems.filter((p) => p.startsWith("error")), []);
   assert.deepEqual(problems, []);
 });

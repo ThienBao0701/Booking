@@ -9,6 +9,7 @@ import type {
   EnvironmentReport,
   Finding,
   FindingDetail,
+  ForensicReport,
   LabStats,
   ReplayRunSummary,
   RulesInfo,
@@ -74,6 +75,25 @@ export class Api {
     return this.#call<T>("GET", `${path}${apiQuery(q)}`);
   }
 
+  /** Raw download (reports): the exact bytes (BOM included), decoded text, and the server-chosen file name. */
+  async download(path: string, q: Q = {}): Promise<{ bytes: ArrayBuffer; text: string; filename: string; contentType: string }> {
+    const res = await this.#fetch(`${path}${apiQuery(q)}`, { headers: { authorization: `Bearer ${this.#token}` }, cache: "no-store", credentials: "omit" });
+    if (!res.ok) {
+      if (res.status === 401) this.onUnauthorized?.();
+      let code = "request_failed";
+      try {
+        code = ((await res.json()) as { error?: string }).error ?? code;
+      } catch {
+        /* not JSON */
+      }
+      throw new ApiError(res.status, code);
+    }
+    const cd = res.headers.get("content-disposition") ?? "";
+    const filename = /filename="([^"]+)"/.exec(cd)?.[1] ?? "lab-report";
+    const bytes = await res.arrayBuffer();
+    return { bytes, text: new TextDecoder().decode(bytes), filename, contentType: res.headers.get("content-type") ?? "application/octet-stream" };
+  }
+
   // ---- typed endpoints ----
   health = () => fetch("/healthz", { cache: "no-store" }).then((r) => r.json() as Promise<Record<string, unknown>>);
   handshake = () => this.get<Record<string, unknown>>("/v1/bridge/handshake");
@@ -93,5 +113,7 @@ export class Api {
   rules = () => this.get<RulesInfo>("/v1/analysis/rules");
   putRules = (rules: unknown) => this.#call<{ source: string; version: string; rules: number }>("PUT", "/v1/analysis/rules", rules);
   resetRules = () => this.#call<{ source: string; version: string }>("DELETE", "/v1/analysis/rules");
+  report = (id: string, compare?: string) => this.get<ForensicReport>(`/v1/reports/sessions/${encodeURIComponent(id)}`, { format: "json", compare });
+  reportFile = (id: string, q: Q) => this.download(`/v1/reports/sessions/${encodeURIComponent(id)}`, q);
   runAnalysis = (sessionIds?: string[]) => this.#call<AnalysisRunSummary>("POST", "/v1/analysis/run", sessionIds ? { sessionIds } : {});
 }

@@ -28,6 +28,7 @@ import { HttpError, MAX_BODY_BYTES, readBody, send } from "./http.ts";
 import { AnalysisService } from "./analysis/service.ts";
 import { routeAnalysis } from "./routes/analysis.ts";
 import { routeQuery } from "./routes/query.ts";
+import { routeReports } from "./routes/reports.ts";
 import { serveDashboard } from "./routes/dashboard.ts";
 import { intParam, searchParam } from "./routes/params.ts";
 
@@ -338,6 +339,10 @@ async function route(
   // Dashboard read queries (Phase 9).
   const queried = await routeQuery(ctx, method, path, url, req, res);
   if (queried !== undefined) return queried;
+
+  // Forensic reports (Phase 10).
+  const reported = await routeReports(ctx, method, path, url, req, res);
+  if (reported !== undefined) return reported;
 
   send(res, 404, { error: "not_found" });
   return 404;

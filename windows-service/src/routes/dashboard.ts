@@ -9,12 +9,16 @@ import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerResponse } from "node:http";
 
+import { REPORT_STYLE_HASH } from "../reports/html.ts";
+
 export const DEFAULT_DASHBOARD_DIR = fileURLToPath(new URL("../../../dashboard/dist/", import.meta.url));
 
 export const DASHBOARD_CSP = [
   "default-src 'none'",
   "script-src 'self'",
-  "style-src 'self'",
+  // The report stylesheet hash lets report previews (blob: documents, which
+  // inherit this policy) render styled; it allows that exact stylesheet only.
+  `style-src 'self' '${REPORT_STYLE_HASH}'`,
   "img-src 'self' data:",
   "connect-src 'self'",
   "base-uri 'none'",

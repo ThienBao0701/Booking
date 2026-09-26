@@ -1,6 +1,6 @@
 # 01 — Architecture
 
-Status: **v1.1** (Phases 0–9 implemented) · Scope: local, single-operator diagnostics lab.
+Status: **v1.1** (Phases 0–10 implemented) · Scope: local, single-operator diagnostics lab.
 
 This document is the source of truth for structure and boundaries. Any change
 to the boundaries below must be proposed as an ADR (see `docs/adr/`) before
@@ -54,7 +54,7 @@ Local Background Service (windows-service/)                   [Phase 3]
    │                                   │
    ▼                                   ▼
 Analyzer · Dashboard · Reports   Mock Extranet (mock-extranet/)   [Phase 5]
-   [8: windows-service/src/analysis · 9: dashboard/ at /dashboard/ · 10 planned]
+   [8: windows-service/src/analysis · 9: dashboard/ at /dashboard/ · 10: windows-service/src/reports]
                                   safe target; emits workflow events
 ```
 
@@ -88,13 +88,20 @@ Analyzer · Dashboard · Reports   Mock Extranet (mock-extranet/)   [Phase 5]
 3. Comparison and graphs are computed on demand. Details:
    [14-analysis](14-analysis.md), [ADR-0005](adr/0005-analyzer-rule-engine-and-findings.md).
 
+### Report path (REPORT) — Phases 9–10
+
+The dashboard (`/dashboard/`, [15-dashboard](15-dashboard.md)) reads the same
+API. Forensic reports (`windows-service/src/reports`,
+[16-reports](16-reports.md)) render one JSON document per session as JSON,
+CSV, HTML and print-ready HTML; every finding links to its exact event ids.
+
 ## 3. Modules and ownership boundaries
 
 | Package            | Owns                                                        | May import        |
 |--------------------|------------------------------------------------------------|-------------------|
 | `shared`           | Contracts: event/recorder/workflow/replay/analysis schemas, **safety policy**, redaction, finding language guard, ids/time | (nothing internal) |
 | `extension`        | MV3 capture, redaction-at-source, recorder, bridge client  | `shared`          |
-| `windows-service`  | localhost API, event bus, SQLite, logs, watchdog, automation engine (controller host), analyzer + rule engine | `shared` |
+| `windows-service`  | localhost API, event bus, SQLite, logs, watchdog, automation engine (controller host), analyzer + rule engine, forensic reports | `shared` |
 | `mock-extranet`    | Safe automation target that emits production-shaped events  | `shared`          |
 | `dashboard`        | Static SPA served by the service at `/dashboard/`: read/visualize sessions, timelines, workflows, events, findings, environment, runs; edit analysis rules (ADR-0006). Triggering replays stays planned. | `shared`          |
 

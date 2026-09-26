@@ -268,3 +268,8 @@ svg.timeline .band:hover .band-rect, svg.timeline .band:focus .band-rect { strok
 
 /* Graph labels stay legible where arcs cross them: a surface-coloured halo. */
 svg.graph text { paint-order: stroke; stroke: var(--surface-1); stroke-width: 4px; stroke-linejoin: round; }
+
+/* reports */
+ul.files { gap: 8px; }
+.file-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.file-label { flex: 1; min-width: 180px; }

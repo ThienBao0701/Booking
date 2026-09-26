@@ -33,7 +33,7 @@ Sign out* forgets it.
 | **Environment** | recorded environment facts per session; values differing from the most common value are marked `≠` | `/v1/analysis/environment` |
 | **Runs** | replay runs with step outcomes; detail with steps, checkpoints, target + authorization record | `/v1/runs`, `/v1/runs/:id` |
 | **Screenshots** | user-triggered capture records (SHA-256, size, format, trigger). Images are not retained by the recorder | `/v1/events?kind=SCREENSHOT` |
-| **Reports** | per-session forensic reports | Phase 10 |
+| **Reports** | per-session forensic report: executive summary, key findings, section overview, integrity digest; download JSON / CSV ×3 / HTML / print-ready HTML; preview HTML ([16-reports](16-reports.md)) | `/v1/reports/sessions/:id` |
 | **Settings** | service health and versions; analysis rules (table, JSON editor validated in the browser with the shared validator and again, fail-closed, by the service; reset to built-in); theme; sign out | `/healthz`, `/v1/bridge/handshake`, `/v1/analysis/rules` |
 
 **Event drawer** (from any event row, tick, evidence row or sample): stored
@@ -67,6 +67,9 @@ follows the OS or the Settings choice.
   setters; hrefs are limited to in-app routes and same-origin paths. The lint
   (`safety/dom-sink`) and the build verification reject HTML sinks and dynamic
   code in the dashboard.
+- The dashboard CSP's `style-src` additionally allows exactly the report
+  stylesheet hash, so report previews (same-origin blob documents that
+  inherit the dashboard policy) render styled; reports contain no scripts.
 - Static route: GET/HEAD only, extension allow-list, `..`/NUL/backslash/hidden
   files rejected, realpath confinement (symlinks cannot escape), `503` with a
   hint when the dashboard is not built.

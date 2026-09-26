@@ -45,7 +45,8 @@
     "test:browser": "node --test --test-concurrency=1 --experimental-strip-types --experimental-sqlite tests/browser/*.test.ts",
     "test:dashboard": "node --test --experimental-strip-types dashboard/test/*.test.ts",
     "build:dashboard": "node --experimental-strip-types dashboard/build.mjs",
-    "dashboard:url": "node --experimental-strip-types scripts/dashboard-url.mjs"
+    "dashboard:url": "node --experimental-strip-types scripts/dashboard-url.mjs",
+    "report": "node --experimental-strip-types --experimental-sqlite windows-service/src/reports/cli.ts"
   },
   "keywords": [
     "diagnostics",

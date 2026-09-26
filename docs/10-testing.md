@@ -5,18 +5,18 @@
 | Suite | Where | Command | Install needed |
 |---|---|---|---|
 | Unit — shared contracts, safety, redaction | `shared/test` | `pnpm run test:shared` | no |
-| Unit + integration — service (auth, security, store, ingestion, watchdog, controller, replay engine, converter, routes, analyzer, rule engine, comparison, analysis API) | `windows-service/test` | `pnpm run test:service` | no |
+| Unit + integration — service (auth, security, store, ingestion, watchdog, controller, replay engine, converter, routes, analyzer, rule engine, comparison, analysis API, dashboard hosting, query API, reports) | `windows-service/test` | `pnpm run test:service` | no |
 | Unit + integration — mock Extranet | `mock-extranet/test` | `pnpm run test:mock` | no |
 | Unit — extension (recorder, bridge, capture, config, manifest policy, environment) | `extension/test` | `pnpm run test:extension` | no |
 | Unit — dashboard (formatting, routing, token handling, chart geometry) | `dashboard/test` | `pnpm run test:dashboard` | no |
-| E2E — bridge, controller, replay on the mock at 127.0.0.1:4599 | `tests/e2e` | `pnpm run test:e2e` | no |
+| E2E — bridge, controller, replay, full pipeline on the mock at 127.0.0.1:4599 | `tests/e2e` | `pnpm run test:e2e` | no |
 | Real-browser E2E — built extension and dashboard in Chromium | `tests/browser` | `pnpm run test:browser` | Chromium (skips without) |
 
 `pnpm run test` = unit + E2E. `pnpm run verify` = lint + typecheck + test + build.
 
-Counts at this revision: **275 unit** (62 shared · 128 service · 11 mock ·
-62 extension · 12 dashboard), **13 E2E**, **10 real-browser** (2 extension ·
-8 dashboard). Earlier tests are unchanged and still pass.
+Counts at this revision: **284 unit** (62 shared · 137 service · 11 mock ·
+62 extension · 12 dashboard), **14 E2E**, **11 real-browser** (2 extension ·
+9 dashboard). Earlier tests are unchanged and still pass.
 
 ## What the E2E suites prove
 
@@ -76,6 +76,29 @@ Counts at this revision: **275 unit** (62 shared · 128 service · 11 mock ·
   (`<script>…`) is shown as text; a finding's evidence lists exactly its
   `event_ids`; timeline ticks/bands match stored events/findings; the workflow
   graph and session comparison are interactive.
+
+## What the report suites prove (Phase 10)
+
+- **Model:** all 11 sections; integrity digest detects changes; stored vs
+  computed findings; every finding's event ids (and evidence ids) are in the
+  timeline and link back; truncation never drops a cited event; baseline
+  selection (explicit / previous / most recent / none); every generated text
+  passes the non-conclusive language guard.
+- **Renderings:** HTML sections in order, an anchor for every cited event and
+  a link from every finding to each of its event ids, no `<script>`/`<img>`
+  from recorded data (hostile selectors and messages are escaped), CSP meta
+  pinning the stylesheet hash, print rules; CSV quoting, BOM, one evidence row
+  per item, and the formula-injection guard (including operator-authored rule
+  titles).
+- **API / CLI:** content types, CSP / frame headers, download names, digest
+  header, 400/404 paths, auth and origin rules; the CLI writes from the
+  database file and fails clearly on bad input.
+- **E2E pipeline:** OBSERVE → RECORD (extension recorder + bridge, two
+  sessions) → REPLAY (example workflow on the mock, run persisted) → ANALYZE
+  (API; every finding resolves to stored events) → COMPARE → REPORT (JSON and
+  HTML links to exact event ids).
+- **Browser:** the Reports page downloads byte-exact JSON / CSV / print HTML
+  and previews a styled, script-free HTML report.
 
 ## The mock at 127.0.0.1:4599
 
