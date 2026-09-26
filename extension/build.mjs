@@ -96,6 +96,17 @@ for (const f of files.filter((p) => p.endsWith(".js"))) {
   const code = readFileSync(f, "utf8");
   for (const re of FORBIDDEN_CODE) if (re.test(code)) fail(`${relative(dist, f)} contains forbidden code: ${re}`);
 }
+// Native messaging (ADR-0009): one connectNative call site (service worker), the lab host only.
+const { NATIVE_HOST_NAME } = await import("../shared/src/native/protocol.ts");
+for (const f of files.filter((p) => p.endsWith(".js"))) {
+  const code = readFileSync(f, "utf8");
+  const rel = relative(dist, f).split("\\").join("/");
+  if (/\bsendNativeMessage\s*\(/.test(code)) fail(`${rel} uses sendNativeMessage (only the validated NativeChannel may talk to the host)`);
+  const calls = (code.match(/\bconnectNative\s*\(/g) ?? []).length;
+  if (calls > 0 && rel !== manifest.background.service_worker) fail(`${rel} calls connectNative; only the service worker may`);
+  if (calls > 1) fail(`${rel} has ${calls} connectNative call sites (expected 1)`);
+  if (calls === 1 && !code.includes(JSON.stringify(NATIVE_HOST_NAME))) fail(`${rel} connects natively but does not reference ${NATIVE_HOST_NAME}`);
+}
 for (const cs of manifest.content_scripts.flatMap((c) => c.js)) {
   const code = readFileSync(join(dist, cs), "utf8");
   if (/^\s*(import|export)\s/m.test(code)) fail(`${cs} must not contain ES module syntax (content scripts are classic scripts)`);

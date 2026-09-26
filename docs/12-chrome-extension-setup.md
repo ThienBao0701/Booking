@@ -34,6 +34,10 @@ scripts. It exits non-zero on any violation.
 5. **Save**, then **Test connection** → expect `"state": "connected"`.
 6. Optional hardening — restrict the service to this extension:
    `LAB_ALLOWED_ORIGINS=chrome-extension://<extension-id>` and restart it.
+7. Optional — Native Messaging (Phase 14): `pnpm run native-host:install --
+   --extension-id <extension-id>`. *Transport* in Options defaults to
+   **Automatic** (native host when installed, HTTP loopback otherwise); the
+   popup shows which one is in use. See [20-native-messaging](20-native-messaging.md).
 
 ## Choose what may be recorded
 
@@ -86,11 +90,12 @@ create duplicates.
 
 - After `git pull`: `pnpm run build:extension`, then click **Reload** on the
   extension card.
-- Removing the extension deletes its queue, token copy and settings.
+- Removing the extension deletes its queue, token copy and settings. If you
+  installed the native host, also run `pnpm run native-host:uninstall`.
 
 ## Permissions
 
-`storage`, `alarms`, `scripting`, `activeTab`; hosts `http://127.0.0.1/*`,
+`storage`, `alarms`, `scripting`, `activeTab`, `nativeMessaging`; hosts `http://127.0.0.1/*`,
 `http://localhost/*`; optional hosts requested per exact origin. The full
 rationale and the list of permissions that are rejected by policy:
 [05 — Security model](05-security-model.md#extension-component-13).

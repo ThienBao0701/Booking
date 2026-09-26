@@ -48,6 +48,15 @@
   the URL is not a lab service; update both to the same release.
 - **Chrome asks about local network access** — allow it for the extension if
   your Chrome version prompts; the service is on 127.0.0.1 only.
+- **Popup shows `HTTP (fallback)`** — the native host is not installed for
+  this extension id, or it refused the connection; hover the value for the
+  reason. Check `pnpm run native-host:status` and `<LAB_DATA_DIR>/logs/native-host.log`.
+  Chrome's own messages: *Specified native messaging host not found* (not
+  registered for this browser/profile), *Access to the specified native
+  messaging host is forbidden* (extension id not in `allowed_origins`:
+  re-run install with the right `--extension-id`), *Native host has exited*
+  (see the host log; `host_misconfigured` means the host config is missing or
+  invalid — reinstall).
 - **Changes to options not applied** — the service worker reloads config on
   every save; a service URL that is not loopback is rejected and the default
   `http://127.0.0.1:4577` is used.

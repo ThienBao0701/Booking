@@ -88,6 +88,7 @@ See [15 — Dashboard](15-dashboard.md).
 | `LAB_LOG_LEVEL` | `info` | `debug` · `info` · `warn` · `error` |
 | `LAB_DASHBOARD_DIR` | `dashboard/dist` | built dashboard served at `/dashboard/` |
 | `LAB_WORKFLOWS_DIR` | `<LAB_DATA_DIR>/workflows` | workflow library for dashboard replays |
+| `LAB_NATIVE_HOST_CONFIG` | — | native host config path when the launcher passes no `--config` ([20](20-native-messaging.md)) |
 | `LAB_BROWSER_EXECUTABLE` | Playwright's Chromium | browser for real-browser dashboard replays |
 | `MOCK_EXTRANET_HOST` / `_PORT` | `127.0.0.1` / `4599` | mock |
 | `MOCK_EXTRANET_URL` | `http://127.0.0.1:4599` | E2E target (must be loopback) |

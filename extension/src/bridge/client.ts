@@ -1,7 +1,7 @@
 /**
  * Extension ↔ local service bridge (Phase 4). Transport: loopback HTTP to the
- * lab service API. (A Native Messaging transport can implement the same
- * `Transport` signature later without touching callers.)
+ * lab service API, or the Native Messaging host (Phase 14,
+ * `native-transport.ts`) behind the same `Transport` signature.
  *
  * Guarantees:
  *  - origin: the service URL must be loopback — enforced at construction, so

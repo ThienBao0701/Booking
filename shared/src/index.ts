@@ -53,3 +53,6 @@ export * from "./api/types.ts";
 
 // Forensic report contract (Phase 10).
 export * from "./reports/types.ts";
+
+// Native Messaging contract (Phase 14, ADR-0009).
+export * from "./native/protocol.ts";

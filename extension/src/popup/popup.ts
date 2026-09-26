@@ -9,6 +9,7 @@ interface Status {
   session: { sessionId: string } | null;
   stats: { recorded: number; delivered: number; queueSize: number; dropped: number; rejected: number; lastError: string | null; blocked: string | null };
   bridge: { state: string; detail: string | null };
+  transport?: { mode: string; active: string; native: string; detail: string | null };
   health: { reachable: boolean; ok: boolean };
   config: { serviceUrl: string; paired: boolean };
 }
@@ -45,6 +46,12 @@ async function refresh(): Promise<void> {
   const bridge = $("bridge");
   bridge.textContent = s.config.paired ? s.bridge.state : "not paired";
   bridge.className = `v ${s.bridge.state === "connected" ? "ok" : s.config.paired ? "warn" : "bad"}`;
+
+  const tr = $("transport");
+  const t = s.transport;
+  tr.textContent = !t ? "—" : t.active === "native" ? "native host" : t.mode === "auto" ? "HTTP (fallback)" : t.active === "http" ? "HTTP loopback" : t.active;
+  tr.title = t?.detail ?? "";
+  tr.className = `v ${t?.active === "native" || t?.mode === "http" ? "ok" : "warn"}`;
 
   $("session").textContent = s.session?.sessionId ?? "—";
   $("recorded").textContent = String(s.stats.recorded);

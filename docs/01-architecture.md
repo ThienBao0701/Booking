@@ -38,8 +38,10 @@ MV3 Extension (extension/)                                   [Phases 1, 2]
                      → IndexedDB queue → debounced/batched flush → retry
    │
    │  Bridge (extension/src/bridge)                           [Phase 4]
-   │  loopback HTTP + bearer token + handshake + timeout + reconnect
-   │  (a Native Messaging transport can implement the same Transport type)
+   │  bearer token + handshake + timeout + reconnect over a Transport:
+   │    native: connectNative → Native host (windows-service/src/native)   [Phase 14]
+   │            validated relay (routes, headers, origin) → loopback HTTP
+   │    http:   loopback HTTP (fallback; "auto" picks native when installed)
    ▼
 Local Background Service (windows-service/)                   [Phase 3]
    loopback-only API: auth, Host/Origin validation, rate limit, size limits

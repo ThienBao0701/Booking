@@ -14,7 +14,7 @@
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
-  "permissions": ["storage", "alarms", "scripting", "activeTab"],
+  "permissions": ["storage", "alarms", "scripting", "activeTab", "nativeMessaging"],
   "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
   "optional_host_permissions": ["https://*/*", "http://*/*"],
   "content_scripts": [

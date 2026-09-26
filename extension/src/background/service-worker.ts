@@ -21,7 +21,8 @@ import { isRecordableUrl, originToMatchPattern, type ExtensionConfig } from "../
 import { isContentMessage, isUiMessage, type ContentMessage, type UiMessage } from "../common/messages.ts";
 import { pagePath, urlHost } from "../common/paths.ts";
 import { browserEnvironment, type NavigatorLike } from "../common/environment.ts";
-import { BridgeClient, type BridgeState } from "../bridge/client.ts";
+import { BridgeClient, type BridgeState, type Transport, fetchTransport } from "../bridge/client.ts";
+import { type AutoTransport, NativeChannel, type PortLike, autoTransport } from "../bridge/native-transport.ts";
 import { Debouncer } from "../recorder/debounce.ts";
 import { Recorder } from "../recorder/recorder.ts";
 import { IdbQueue } from "../storage/idb-queue.ts";
@@ -39,6 +40,8 @@ interface Ctx {
   trackedTabs: Set<number>;
   bridgeState: BridgeState;
   bridgeDetail: string | undefined;
+  /** Phase 14: the transport the bridge uses (native host, HTTP loopback, or auto). */
+  link: { transport: Transport; native: NativeChannel | undefined; auto: AutoTransport | undefined };
   persistSeq: Debouncer;
 }
 
@@ -48,10 +51,36 @@ function ctx(): Promise<Ctx> {
   return ctxPromise;
 }
 
+/** Native messaging (Phase 14) with HTTP loopback kept as the fallback. */
+function makeLink(config: ExtensionConfig): Ctx["link"] {
+  if (config.transport === "http") return { transport: fetchTransport, native: undefined, auto: undefined };
+  const native = new NativeChannel({
+    connect: (name) => chrome.runtime.connectNative(name) as unknown as PortLike,
+    lastError: () => chrome.runtime.lastError?.message,
+    extensionVersion: chrome.runtime.getManifest().version,
+  });
+  if (config.transport === "native") return { transport: native.transport, native, auto: undefined };
+  const auto = autoTransport({ native, http: fetchTransport });
+  return { transport: auto.transport, native, auto };
+}
+
+function transportInfo(c: Ctx): { mode: string; active: string; native: string; detail: string | null } {
+  const native = c.link.native?.status;
+  return {
+    mode: c.config.transport,
+    active: c.link.auto ? c.link.auto.kind() : c.config.transport,
+    native: native?.state ?? "off",
+    detail: c.link.auto?.fallbackReason() ?? native?.detail ?? null,
+  };
+}
+
 function makeBridge(c: Ctx, config: ExtensionConfig): BridgeClient {
+  c.link?.native?.close();
+  c.link = makeLink(config);
   return new BridgeClient({
     serviceUrl: config.serviceUrl,
     token: config.token,
+    transport: c.link.transport,
     onStateChange: (s, detail) => {
       c.bridgeState = s;
       c.bridgeDetail = detail;
@@ -185,6 +214,7 @@ async function onUi(msg: UiMessage): Promise<unknown> {
         session: c.recorder.session ?? null,
         stats: c.recorder.stats,
         bridge: { state: c.bridgeState, detail: c.bridgeDetail ?? null },
+        transport: transportInfo(c),
         health,
         config: { serviceUrl: c.config.serviceUrl, paired: c.config.token.length > 0, targetOrigins: c.config.targetOrigins },
       };
@@ -349,7 +379,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local" || !changes[store.CONFIG_KEY]) return;
   void ctx().then(async (c) => {
     const next = await store.loadConfig();
-    const bridgeChanged = next.serviceUrl !== c.config.serviceUrl || next.token !== c.config.token;
+    const bridgeChanged = next.serviceUrl !== c.config.serviceUrl || next.token !== c.config.token || next.transport !== c.config.transport;
     c.config = next;
     if (bridgeChanged) {
       const pending = c.bridge.pendingEnds;

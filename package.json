@@ -46,7 +46,10 @@
     "test:dashboard": "node --test --experimental-strip-types dashboard/test/*.test.ts",
     "build:dashboard": "node --experimental-strip-types dashboard/build.mjs",
     "dashboard:url": "node --experimental-strip-types scripts/dashboard-url.mjs",
-    "report": "node --experimental-strip-types --experimental-sqlite windows-service/src/reports/cli.ts"
+    "report": "node --experimental-strip-types --experimental-sqlite windows-service/src/reports/cli.ts",
+    "native-host:install": "node --experimental-strip-types windows-service/src/native/cli.ts install",
+    "native-host:uninstall": "node --experimental-strip-types windows-service/src/native/cli.ts uninstall",
+    "native-host:status": "node --experimental-strip-types windows-service/src/native/cli.ts status"
   },
   "keywords": [
     "diagnostics",

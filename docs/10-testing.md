@@ -125,6 +125,16 @@ service mode caps runs (an `OBSERVE` service never executes); one active run;
 parameter values never reach logs or stored runs; the example completes on the
 real mock through the API and through the page in Chromium.
 
+## What the native-messaging suites prove (Phase 14)
+
+See [20-native-messaging](20-native-messaging.md#tests): the protocol is
+validated fail-closed in both directions; only allowed extensions and only the
+bridge's routes and headers get through; the service still authenticates and
+origin-checks every relayed call; timeouts, size limits and host crashes are
+handled; install / upgrade / uninstall leave nothing behind; a real Chromium
+delivers a recorded session through the installed host and falls back to HTTP
+after uninstall.
+
 ## The mock at 127.0.0.1:4599
 
 E2E tests target `MOCK_EXTRANET_URL` (default `http://127.0.0.1:4599`, must be

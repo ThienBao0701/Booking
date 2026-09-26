@@ -24,7 +24,15 @@ export interface ExtensionConfig {
   maxQueue: number;
   /** DOM-mutation summary debounce. */
   domDebounceMs: number;
+  /**
+   * Bridge transport (Phase 14): "auto" uses the native messaging host when it
+   * is installed and falls back to HTTP loopback; "native" / "http" force one.
+   */
+  transport: BridgeTransportMode;
 }
+
+export const BRIDGE_TRANSPORTS = ["auto", "native", "http"] as const;
+export type BridgeTransportMode = (typeof BRIDGE_TRANSPORTS)[number];
 
 export const DEFAULT_CONFIG: ExtensionConfig = {
   serviceUrl: "http://127.0.0.1:4577",
@@ -35,6 +43,7 @@ export const DEFAULT_CONFIG: ExtensionConfig = {
   flushIntervalMs: 2000,
   maxQueue: 5000,
   domDebounceMs: 500,
+  transport: "auto",
 };
 
 /** Normalize an origin string ("https://Host:8443/" → "https://host:8443"). Undefined if invalid. */
@@ -83,6 +92,7 @@ export function validateConfig(
   if (!intIn(c.flushIntervalMs, 250, 60_000)) errors.push("flushIntervalMs must be 250..60000");
   if (!intIn(c.maxQueue, 100, 50_000)) errors.push("maxQueue must be 100..50000");
   if (!intIn(c.domDebounceMs, 100, 10_000)) errors.push("domDebounceMs must be 100..10000");
+  if (!(BRIDGE_TRANSPORTS as readonly string[]).includes(c.transport)) errors.push("transport must be auto, native or http");
   return errors.length ? { ok: false, errors } : { ok: true, value: c };
 }
 

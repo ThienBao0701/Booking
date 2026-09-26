@@ -4,14 +4,19 @@
  * both CI and the build.
  */
 
-/** The only API permissions the extension may request. */
-export const ALLOWED_PERMISSIONS = ["storage", "alarms", "scripting", "activeTab"] as const;
+/**
+ * The only API permissions the extension may request. `nativeMessaging`
+ * (Phase 14, ADR-0009) lets the extension reach ONLY native hosts whose
+ * manifest lists this extension's id in `allowed_origins`; the code may use it
+ * only to connect to the lab host (lint + build enforce the host name).
+ */
+export const ALLOWED_PERMISSIONS = ["storage", "alarms", "scripting", "activeTab", "nativeMessaging"] as const;
 
 /**
  * Permissions that are never acceptable here, each tied to an excluded
  * capability: request manipulation (Component 7 is observe-only), proxy (IP
  * rotation), debugger/CDP (fingerprint manipulation), cookies/privacy (auth
- * secrets), management/nativeMessaging (not used; would widen reach).
+ * secrets), management (would widen reach).
  */
 export const FORBIDDEN_PERMISSIONS = [
   "proxy",
@@ -23,7 +28,6 @@ export const FORBIDDEN_PERMISSIONS = [
   "cookies",
   "privacy",
   "management",
-  "nativeMessaging",
   "contentSettings",
   "history",
   "tabs",

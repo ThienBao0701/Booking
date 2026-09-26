@@ -19,6 +19,7 @@ function render(): void {
   input("serviceUrl").value = config.serviceUrl;
   input("token").value = config.token;
   $<HTMLSelectElement>("safetyMode").value = config.safetyMode;
+  $<HTMLSelectElement>("transport").value = config.transport;
   input("batchSize").value = String(config.batchSize);
   input("flushIntervalMs").value = String(config.flushIntervalMs);
   input("domDebounceMs").value = String(config.domDebounceMs);
@@ -44,6 +45,7 @@ function readForm(): Partial<ExtensionConfig> {
     serviceUrl: input("serviceUrl").value.trim(),
     token: input("token").value.trim(),
     safetyMode: $<HTMLSelectElement>("safetyMode").value as ExtensionConfig["safetyMode"],
+    transport: $<HTMLSelectElement>("transport").value as ExtensionConfig["transport"],
     batchSize: Number(input("batchSize").value),
     flushIntervalMs: Number(input("flushIntervalMs").value),
     domDebounceMs: Number(input("domDebounceMs").value),

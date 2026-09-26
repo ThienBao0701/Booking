@@ -10,6 +10,8 @@
 //   safety/forbidden-cap  forbidden capability identifiers only in the denylist module
 //   safety/evasion-api    no navigator/screen property overrides, no proxy/debugger APIs
 //   safety/manifest       extension manifest passes the least-privilege policy
+//   safety/native-host    native messaging (ADR-0009): connectNative only in the service
+//                         worker, never sendNativeMessage, only the lab host name
 //   hygiene/*             no `debugger;`, no focused tests (.only)
 // Test harnesses (*/test, tests/) are exempt from boundary rules only.
 
@@ -29,6 +31,7 @@ const FORBIDDEN_CAPS = [
   "FAKE_USER_BEHAVIOR",
 ];
 const CAP_ALLOWED_FILES = new Set(["shared/src/safety/capabilities.ts"]);
+const NATIVE_CONNECT_FILE = "extension/src/background/service-worker.ts";
 const EVASION_PATTERNS = [
   [/Object\.defineProperty\(\s*(?:window\.)?(?:navigator|screen)\b/, "overriding navigator/screen properties (fingerprint spoofing)"],
   [/\bnavigator\.webdriver\s*=/, "assigning navigator.webdriver (bot-detection evasion)"],
@@ -122,6 +125,14 @@ for (const abs of files) {
     for (const [re, why] of EVASION_PATTERNS) {
       const mm = re.exec(text);
       if (mm) report(rel, lineOf(text, mm.index), "safety/evasion-api", why);
+    }
+    if (top === "extension") {
+      const send = /\bsendNativeMessage\s*\(/.exec(text);
+      if (send) report(rel, lineOf(text, send.index), "safety/native-host", "use the NativeChannel (validated handshake), not sendNativeMessage");
+      const conn = /\bconnectNative\s*\(/.exec(text);
+      if (conn && rel !== NATIVE_CONNECT_FILE) report(rel, lineOf(text, conn.index), "safety/native-host", `connectNative may only be called in ${NATIVE_CONNECT_FILE}`);
+      const hostLit = /["'`]com\.[a-z0-9_]+(?:\.[a-z0-9_]+)+["'`]/.exec(text);
+      if (hostLit) report(rel, lineOf(text, hostLit.index), "safety/native-host", "native host names come only from shared NATIVE_HOST_NAME");
     }
     if (top === "dashboard") {
       for (const [re, why] of DOM_SINKS) {

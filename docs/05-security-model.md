@@ -81,12 +81,13 @@ All service endpoints:
 | `alarms` | 30 s delivery / reconnect backstop (MV3 workers sleep) |
 | `scripting` | register the content script for origins the operator grants |
 | `activeTab` | user-triggered screenshot of the current tab |
+| `nativeMessaging` | reach the lab's own native host (Phase 14, ADR-0009); only hosts whose manifest lists this extension id; `connectNative` only in the service worker, with the lab host name |
 | hosts `http://127.0.0.1/*`, `http://localhost/*` | the local service and the mock Extranet |
 | optional hosts `http(s)://*/*` | requested **per exact origin** from Options; never granted wholesale |
 
 - No `<all_urls>`, `tabs`, `webNavigation`, `webRequest*`,
   `declarativeNetRequest*`, `cookies`, `proxy`, `debugger`, `privacy`,
-  `management`, `nativeMessaging`, `externally_connectable`,
+  `management`, `optional_permissions`, `externally_connectable`,
   `web_accessible_resources`, or remote/inline/eval scripts. The policy
   (`extension/src/common/manifest-policy.ts`) is enforced by unit tests, by the
   build and by the lint.
@@ -106,6 +107,15 @@ All service endpoints:
   `redirect: "error"` (a redirect can never carry the token elsewhere).
 - The handshake verifies the endpoint is a lab service with a compatible
   contract version before the first event is sent.
+- **Native Messaging transport** (Phase 14, ADR-0009): the native host is a
+  validated relay with no secret of its own. Chrome's `allowed_origins` and the
+  host's own config both check the caller extension; the host forwards the
+  extension's bearer token and origin, so the service authenticates and
+  origin-checks exactly as over HTTP. Only the bridge's six routes and the
+  `authorization` / `content-type` / `accept` headers are relayed; every
+  message is schema-validated; framing errors are fatal; requests time out;
+  logs never contain headers or bodies. Details and tests:
+  [20-native-messaging](20-native-messaging.md).
 
 ## Replay / automation
 

@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { ReplayEngine } from "../../windows-service/src/automation/engine.ts";
 import { MockExtranetController } from "../../windows-service/src/automation/mock-controller.ts";
 import type { WorkflowFile } from "../../shared/src/index.ts";
+import { extensionServiceWorker } from "./extension-worker.ts";
 import { authedGet, ensureMock, startLabService, type LabServiceHandle, type MockHandle } from "../e2e/harness.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -73,7 +74,7 @@ before(async () => {
     headless: true,
     args: [`--disable-extensions-except=${dist}`, `--load-extension=${dist}`, "--no-first-run"],
   });
-  worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  worker = await extensionServiceWorker(context);
   extensionId = new URL(worker.url()).host;
   // Pair the extension with this service (what the Options page does).
   await worker.evaluate(

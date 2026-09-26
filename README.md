@@ -45,7 +45,8 @@ account.
 | 11 | Browser adapter: Chromium via Playwright/CDP behind the controller interface; target policy + explicit origin allowlist + per-session egress proxy | ✅ |
 | 12 | Screenshot storage: optional local PNGs (off by default), bound to their capture event, retention / size / budget limits, delete; dashboard shows the images | ✅ |
 | 13 | Dashboard replay: dry-run plan → review (target, authorization, workflow, step count, risk notice) → explicit acknowledged start; live progress, controls, logs; service mode is the ceiling | ✅ |
-| 14–15 | Native messaging · Windows production hardening | ⬜ next |
+| 14 | Native messaging: extension → native host (validated relay, handshake + version negotiation, origin check, route/header allowlist) → service; HTTP loopback fallback; per-user install/uninstall | ✅ |
+| 15 | Windows production hardening | ⬜ next |
 
 **Tests:** 316 unit · 14 E2E on the mock at 127.0.0.1:4599 (incl. the full
 OBSERVE → RECORD → REPLAY → ANALYZE → COMPARE → REPORT pipeline) · 15
@@ -121,6 +122,7 @@ docs/              source-of-truth documentation + ADRs
 | Browser adapter (real-browser replay) | [17-browser-adapter](docs/17-browser-adapter.md) |
 | Screenshot storage | [18-screenshot-storage](docs/18-screenshot-storage.md) |
 | Dashboard replay | [19-dashboard-replay](docs/19-dashboard-replay.md) |
+| Native messaging | [20-native-messaging](docs/20-native-messaging.md) |
 | ADRs | [docs/adr](docs/adr/) |
 
 ## Safety modes
