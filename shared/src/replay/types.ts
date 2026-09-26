@@ -85,4 +85,6 @@ export interface RunRecord {
   sourceSessionId?: string;
   /** True when executed without side effects. */
   dryRun?: boolean;
+  /** The replay target incl. its authorization record (traceability; additive). */
+  target?: ReplayTarget;
 }

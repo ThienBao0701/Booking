@@ -197,6 +197,7 @@ export class ReplayEngine {
       status: "pending",
       steps: this.file.steps.map((s) => ({ id: s.id, status: "pending" as const, attempts: 0 })),
       checkpoints: [],
+      target: structuredClone(this.file.target as ReplayTarget),
       ...(opts.sourceSessionId !== undefined ? { sourceSessionId: opts.sourceSessionId } : {}),
     };
   }

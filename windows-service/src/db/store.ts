@@ -14,7 +14,7 @@ import {
   redactValue,
   looksSensitive,
 } from "../shared.ts";
-import { DDL, PRAGMAS, SCHEMA_VERSION } from "./schema.ts";
+import { ADDED_COLUMNS, DDL, PRAGMAS, SCHEMA_VERSION } from "./schema.ts";
 
 export interface NewSession {
   id: string;
@@ -47,11 +47,20 @@ export class Store {
     this.#db = new DatabaseSync(dbPath);
     for (const p of PRAGMAS) this.#db.exec(p);
     this.#db.exec(DDL);
+    this.#migrate();
     this.#setMeta("schema_version", String(SCHEMA_VERSION));
   }
 
   close(): void {
     this.#db.close();
+  }
+
+  /** Apply additive column migrations to databases from older schema versions. */
+  #migrate(): void {
+    for (const [table, column, definition] of ADDED_COLUMNS) {
+      const cols = this.#db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      if (!cols.some((c) => c.name === column)) this.#db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
   }
 
   #setMeta(key: string, value: string): void {
@@ -221,11 +230,11 @@ export class Store {
     this.transaction(() => {
       this.#db
         .prepare(
-          `INSERT INTO runs(run_id, workflow, mode, started_at, ended_at, status, checkpoints, source_session_id, dry_run)
-           VALUES(?,?,?,?,?,?,?,?,?)
+          `INSERT INTO runs(run_id, workflow, mode, started_at, ended_at, status, checkpoints, source_session_id, dry_run, target)
+           VALUES(?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT(run_id) DO UPDATE SET
              ended_at=excluded.ended_at, status=excluded.status,
-             checkpoints=excluded.checkpoints, dry_run=excluded.dry_run`,
+             checkpoints=excluded.checkpoints, dry_run=excluded.dry_run, target=excluded.target`,
         )
         .run(
           run.runId,
@@ -237,6 +246,7 @@ export class Store {
           JSON.stringify(run.checkpoints),
           run.sourceSessionId ?? null,
           run.dryRun ? 1 : 0,
+          run.target ? JSON.stringify(run.target) : null,
         );
       const upsertStep = this.#db.prepare(
         `INSERT INTO run_steps(run_id, step_id, status, started_at, ended_at, attempts, error)
@@ -269,6 +279,7 @@ export class Store {
       checkpoints: JSON.parse(row.checkpoints as string) as string[],
       ...(row.source_session_id != null ? { sourceSessionId: row.source_session_id as string } : {}),
       dryRun: row.dry_run === 1,
+      ...(row.target != null ? { target: JSON.parse(row.target as string) as NonNullable<RunRecord["target"]> } : {}),
       steps: steps.map((s) => ({
         id: s.step_id as string,
         status: s.status as RunRecord["steps"][number]["status"],

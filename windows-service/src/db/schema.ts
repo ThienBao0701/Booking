@@ -10,7 +10,19 @@ export const PRAGMAS = [
   "PRAGMA busy_timeout = 5000;",
 ];
 
+/**
+ * Bumped only for BREAKING schema changes. Backward-compatible additions are
+ * applied by ADDED_COLUMNS below and keep the version unchanged.
+ */
 export const SCHEMA_VERSION = 1;
+
+/**
+ * Additive, backward-compatible column migrations for databases created before
+ * the column existed: [table, column, definition]. Applied only when missing.
+ */
+export const ADDED_COLUMNS: ReadonlyArray<[string, string, string]> = [
+  ["runs", "target", "TEXT"], // target + authorization record per run (traceability)
+];
 
 export const DDL = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -68,7 +80,8 @@ CREATE TABLE IF NOT EXISTS runs (
   status            TEXT NOT NULL,
   checkpoints       TEXT NOT NULL DEFAULT '[]',
   source_session_id TEXT,
-  dry_run           INTEGER NOT NULL DEFAULT 0
+  dry_run           INTEGER NOT NULL DEFAULT 0,
+  target            TEXT
 );
 
 CREATE TABLE IF NOT EXISTS run_steps (
