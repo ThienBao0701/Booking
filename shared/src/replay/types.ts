@@ -55,6 +55,8 @@ export const RUN_STATUSES = [
   "completed",
   "failed",
   "rolledBack",
+  /** Operator stopped the run before completion (additive, contract v1-compatible). */
+  "stopped",
 ] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 

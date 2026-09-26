@@ -197,6 +197,23 @@ export class Store {
       .all(sessionId, limit) as unknown as StoredEventRow[];
   }
 
+  /** Stored events as wire-contract LabEvents (ordered by seq). */
+  getLabEvents(sessionId: string, limit = 10_000): LabEvent[] {
+    return this.getEvents(sessionId, limit).map((r) => ({
+      id: r.id,
+      sessionId: r.session_id,
+      seq: r.seq,
+      ts: r.ts,
+      ...(r.tab_id !== null ? { tabId: r.tab_id } : {}),
+      kind: r.kind as LabEvent["kind"],
+      category: r.category as LabEvent["category"],
+      ...(r.workflow !== null ? { workflow: r.workflow as NonNullable<LabEvent["workflow"]> } : {}),
+      severity: r.severity as LabEvent["severity"],
+      redacted: r.redacted === 1,
+      data: JSON.parse(r.data) as Record<string, unknown>,
+    }));
+  }
+
   // ---- replay runs (docs/04-replay-format.md run record) ----
 
   /** Upsert a replay run record and its step results atomically. */

@@ -16,10 +16,13 @@ import {
   type LabEvent,
   newPrefixedId,
   validateEventBatch,
+  fromLabEvent,
+  isLoopbackUrl,
   DEFAULT_SAFETY_MODE,
   CONTRACT_VERSION,
   LAB_VERSION,
 } from "./shared.ts";
+import { recordingToWorkflow } from "./automation/convert.ts";
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2 MiB per request
 /** Max events accepted per POST /v1/events (request validation; bridge batches below this). */
@@ -156,7 +159,7 @@ async function route(
   ctx: Ctx,
   method: string,
   path: string,
-  _url: URL,
+  url: URL,
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<number> {
@@ -235,6 +238,42 @@ async function route(
       return 404;
     }
     send(res, 200, { session: s, eventCount: store.countEvents(id) });
+    return 200;
+  }
+
+  // GET /v1/sessions/:id/workflow?baseUrl=&name= — replayable draft of a recording
+  const wfMatch = /^\/v1\/sessions\/([^/]+)\/workflow$/.exec(path);
+  if (method === "GET" && wfMatch) {
+    const id = decodeURIComponent(wfMatch[1] as string);
+    if (!store.hasSession(id)) {
+      send(res, 404, { error: "not_found" });
+      return 404;
+    }
+    const baseUrl = url.searchParams.get("baseUrl") ?? "http://127.0.0.1:4599";
+    if (!isLoopbackUrl(baseUrl)) {
+      // Drafts always target the local mock; retargeting to an authorized system
+      // is a deliberate operator edit (kind "authorized" + authorization record).
+      send(res, 400, { error: "draft_target_must_be_local_mock" });
+      return 400;
+    }
+    const events = store.getLabEvents(id).map(fromLabEvent);
+    const draft = recordingToWorkflow(events, {
+      workflow: url.searchParams.get("name") ?? `replay-${id}`,
+      target: { kind: "mock", baseUrl },
+    });
+    send(res, 200, draft);
+    return 200;
+  }
+
+  // GET /v1/runs/:id — persisted replay run record
+  const runMatch = /^\/v1\/runs\/([^/]+)$/.exec(path);
+  if (method === "GET" && runMatch) {
+    const run = store.getRun(decodeURIComponent(runMatch[1] as string));
+    if (!run) {
+      send(res, 404, { error: "not_found" });
+      return 404;
+    }
+    send(res, 200, { run });
     return 200;
   }
 

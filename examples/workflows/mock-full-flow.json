@@ -1,0 +1,57 @@
+{
+  "workflow": "mock-full-flow",
+  "version": 1,
+  "target": { "kind": "mock", "baseUrl": "http://127.0.0.1:4599" },
+  "defaults": { "timeoutMs": 10000, "retries": 1 },
+  "steps": [
+    { "id": "open", "action": "navigate", "target": "/" },
+    { "id": "user", "action": "type", "target": "#login-username", "value": "{{username}}" },
+    { "id": "login", "action": "click", "target": "#login-submit" },
+    { "id": "logged-in", "action": "waitFor", "target": "#actor[data-actor]:not([data-actor=\"\"])", "checkpoint": true },
+
+    { "id": "nav-property", "action": "click", "target": "button[data-view=\"property\"]" },
+    { "id": "prop-name", "action": "type", "target": "#prop-name", "value": "{{propertyName}}" },
+    { "id": "prop-address", "action": "type", "target": "#prop-address", "value": "1 Test Road" },
+    { "id": "create-property", "action": "click", "target": "#prop-submit", "checkpoint": true },
+
+    { "id": "nav-rooms", "action": "click", "target": "button[data-view=\"rooms\"]" },
+    { "id": "room-property", "action": "select", "target": "#room-property", "value": "$last" },
+    { "id": "room-name", "action": "type", "target": "#room-name", "value": "Deluxe King" },
+    { "id": "room-type", "action": "type", "target": "#room-type", "value": "double" },
+    { "id": "create-room", "action": "click", "target": "#room-submit" },
+
+    { "id": "nav-rates", "action": "click", "target": "button[data-view=\"rates\"]" },
+    { "id": "rate-room", "action": "select", "target": "#rate-room", "value": "$last" },
+    { "id": "rate-amount", "action": "type", "target": "#rate-amount", "value": "150" },
+    { "id": "save-rate", "action": "click", "target": "#rate-submit" },
+
+    { "id": "nav-reservations", "action": "click", "target": "button[data-view=\"reservations\"]" },
+    { "id": "res-property", "action": "select", "target": "#res-property", "value": "$last" },
+    { "id": "res-room", "action": "select", "target": "#res-room", "value": "$last" },
+    { "id": "res-guest", "action": "type", "target": "#res-guest", "value": "TEST_GUEST" },
+    { "id": "res-in", "action": "type", "target": "#res-in", "value": "2026-10-01" },
+    { "id": "res-out", "action": "type", "target": "#res-out", "value": "2026-10-03" },
+    { "id": "create-reservation", "action": "click", "target": "#res-submit", "checkpoint": true },
+    { "id": "row-visible", "action": "waitFor", "target": "button[data-cancel=\"$last\"]" },
+    { "id": "cancel", "action": "click", "target": "button[data-cancel=\"$last\"]" },
+
+    { "id": "nav-messages", "action": "click", "target": "button[data-view=\"messages\"]" },
+    { "id": "msg", "action": "type", "target": "#msg-text", "value": "TEST_MESSAGE" },
+    { "id": "send", "action": "click", "target": "#msg-submit" },
+
+    { "id": "nav-reviews", "action": "click", "target": "button[data-view=\"reviews\"]" },
+    { "id": "rev-property", "action": "select", "target": "#rev-property", "value": "$last" },
+    { "id": "rev-text", "action": "type", "target": "#rev-text", "value": "TEST_REVIEW" },
+    { "id": "review", "action": "click", "target": "#rev-submit" },
+
+    { "id": "nav-photos", "action": "click", "target": "button[data-view=\"photos\"]" },
+    { "id": "photo-property", "action": "select", "target": "#photo-property", "value": "$last" },
+    { "id": "photo", "action": "click", "target": "#photo-submit" },
+
+    { "id": "nav-reports", "action": "click", "target": "button[data-view=\"reports\"]" },
+    { "id": "report-property", "action": "select", "target": "#report-property", "value": "$last" },
+    { "id": "report", "action": "click", "target": "#report-submit" },
+    { "id": "report-ready", "action": "waitFor", "target": "#report-out[data-report=\"1\"]" },
+    { "id": "final-state", "action": "captureState" }
+  ]
+}
