@@ -5,7 +5,8 @@
 //   boundary/sibling      packages never import each other (only shared)
 //   boundary/coupling     shared is imported only via each package's src/shared.ts
 //   boundary/shared-pure  shared/src imports nothing outside itself and no node: builtins
-//   boundary/browser      extension/src must not import node: builtins
+//   boundary/browser      extension/src and dashboard/src must not import node: builtins
+//   safety/dom-sink       dashboard/src renders recorded data as text: no HTML sinks or dynamic code
 //   safety/forbidden-cap  forbidden capability identifiers only in the denylist module
 //   safety/evasion-api    no navigator/screen property overrides, no proxy/debugger APIs
 //   safety/manifest       extension manifest passes the least-privilege policy
@@ -32,6 +33,17 @@ const EVASION_PATTERNS = [
   [/Object\.defineProperty\(\s*(?:window\.)?(?:navigator|screen)\b/, "overriding navigator/screen properties (fingerprint spoofing)"],
   [/\bnavigator\.webdriver\s*=/, "assigning navigator.webdriver (bot-detection evasion)"],
   [/\bchrome\.(?:proxy|debugger)\b/, "chrome.proxy / chrome.debugger APIs (IP rotation / CDP manipulation)"],
+];
+
+// Recorded data is untrusted: the dashboard builds DOM with text nodes only (ADR-0006).
+const DOM_SINKS = [
+  [/\.(?:innerHTML|outerHTML)\s*=/, "innerHTML/outerHTML assignment"],
+  [/\binsertAdjacentHTML\s*\(/, "insertAdjacentHTML"],
+  [/\bdocument\.write(?:ln)?\s*\(/, "document.write"],
+  [/\bcreateContextualFragment\s*\(/, "createContextualFragment"],
+  [/\beval\s*\(/, "eval"],
+  [/\bnew\s+Function\s*\(/, "new Function"],
+  [/setAttribute\(\s*["'](?:style|on[a-z]+)["']/, "inline style / event-handler attribute (blocked by CSP)"],
 ];
 
 const violations = [];
@@ -77,7 +89,7 @@ for (const abs of files) {
     const line = lineOf(text, m.index ?? 0);
     if (spec.startsWith("node:")) {
       if (!isTest && top === "shared") report(rel, line, "boundary/shared-pure", `shared must be runtime-agnostic; imports ${spec}`);
-      if (!isTest && top === "extension") report(rel, line, "boundary/browser", `extension code runs in the browser; imports ${spec}`);
+      if (!isTest && (top === "extension" || top === "dashboard")) report(rel, line, "boundary/browser", `${top} code runs in the browser; imports ${spec}`);
       continue;
     }
     if (!spec.startsWith(".")) continue;
@@ -108,6 +120,12 @@ for (const abs of files) {
     for (const [re, why] of EVASION_PATTERNS) {
       const mm = re.exec(text);
       if (mm) report(rel, lineOf(text, mm.index), "safety/evasion-api", why);
+    }
+    if (top === "dashboard") {
+      for (const [re, why] of DOM_SINKS) {
+        const mm = re.exec(text);
+        if (mm) report(rel, lineOf(text, mm.index), "safety/dom-sink", why);
+      }
     }
   }
   const dbg = /^\s*debugger\s*;?\s*$/m.exec(text);

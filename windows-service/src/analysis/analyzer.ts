@@ -167,6 +167,11 @@ export function compare(a: SessionData, b: SessionData): SessionComparison {
   return compareSessions(pa, pb);
 }
 
+/** Environment report of one session (recorded facts only). */
+export function environmentReport(data: SessionData): EnvironmentReport {
+  return prepare(data).environment;
+}
+
 export function cohortGraph(sessions: readonly SessionData[]): WorkflowGraph {
   return workflowGraph(sessions.map((s) => ({ session_id: s.session.sessionId, segments: segmentSession(s) })));
 }

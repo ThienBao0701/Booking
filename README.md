@@ -40,11 +40,12 @@ account.
 | 6 | BrowserController interface + mock controller | ✅ |
 | 7 | Replay engine (start/pause/resume/stop/step/retry/checkpoint/rollback/dryRun) + recording → workflow + CLI | ✅ |
 | 8 | Analyzer: segmentation, timing, sequences, anomalies, comparison, correlation, graph, evidence + JSON rule engine | ✅ |
-| 9–10 | Dashboard · forensic reports | ⬜ next |
+| 9 | Forensic dashboard at `/dashboard/`: overview, sessions + compare, timeline, workflow graph, events, findings drill-down, environment, runs, screenshots, settings | ✅ |
+| 10 | Forensic reports | ⬜ next |
 | 11–15 | Security hardening · packaging · Windows installer | ⬜ (CI, lint, tests in place) |
 
-**Tests:** 254 unit · 13 E2E on the mock at 127.0.0.1:4599 · 2 real-browser
-(built extension in Chromium). Lint, typecheck (6 configs) and the verified
+**Tests:** 275 unit · 13 E2E on the mock at 127.0.0.1:4599 · 10 real-browser
+(built extension and dashboard in Chromium). Lint, typecheck (6 configs) and the verified
 extension build run in CI. See [docs/10-testing.md](docs/10-testing.md).
 
 ## Quick start
@@ -57,7 +58,8 @@ pnpm run verify                  # lint + typecheck + unit + E2E + extension bui
 
 pnpm run start:service           # local service → http://127.0.0.1:4577 (token in .lab-runtime/auth-token.txt)
 pnpm run start:mock              # mock Extranet  → http://127.0.0.1:4599
-pnpm run build:extension         # load extension/dist unpacked, paste the token in Options
+pnpm run build                   # extension/dist (load unpacked, paste the token in Options) + dashboard/dist
+pnpm run dashboard:url           # → http://127.0.0.1:4577/dashboard/#token=…  (forensic dashboard)
 
 pnpm run replay:example          # replay all ten mock modules (SIMULATE mode)
 ```
@@ -83,7 +85,7 @@ extension/         MV3 recorder: service worker, content script, recorder, bridg
 windows-service/   loopback API, event bus, SQLite, watchdog; src/automation: controller, replay engine, CLI;
                    src/analysis: analyzer + JSON rule engine
 mock-extranet/     safe local Extranet (login, property, rooms, rates, reservations, messages, reviews, photos, reports)
-dashboard/         (Phase 9)
+dashboard/         forensic dashboard (static SPA served by the service at /dashboard/)
 examples/          runnable workflow files
 tests/             cross-package E2E (tests/e2e) and real-browser tests (tests/browser)
 scripts/lint.mjs   architecture + safety lint
@@ -108,6 +110,7 @@ docs/              source-of-truth documentation + ADRs
 | Chrome extension setup | [12-chrome-extension-setup](docs/12-chrome-extension-setup.md) |
 | Windows service setup | [13-windows-service-setup](docs/13-windows-service-setup.md) |
 | Workflow analysis, rules, findings | [14-analysis](docs/14-analysis.md) |
+| Forensic dashboard | [15-dashboard](docs/15-dashboard.md) |
 | ADRs | [docs/adr](docs/adr/) |
 
 ## Safety modes

@@ -1,0 +1,97 @@
+/**
+ * Typed client for the local service API. Same origin; the bearer token is
+ * attached to every call; no cookies. Response shapes are the shared contracts.
+ */
+
+import type {
+  AnalysisResult,
+  AnalysisRunSummary,
+  EnvironmentReport,
+  Finding,
+  FindingDetail,
+  LabStats,
+  ReplayRunSummary,
+  RulesInfo,
+  RunRecord,
+  SessionComparison,
+  SessionRecord,
+  SessionSummary,
+  StoredEventRow,
+  WorkflowGraph,
+} from "./shared.ts";
+import { apiQuery } from "./route.ts";
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly details: unknown;
+  constructor(status: number, code: string, details?: unknown) {
+    super(`${status} ${code}`);
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
+type Q = Record<string, string | number | undefined | null>;
+
+export class Api {
+  #token: string;
+  #fetch: typeof fetch;
+  onUnauthorized: (() => void) | undefined;
+
+  constructor(token: string, fetchImpl: typeof fetch = (...a) => fetch(...a)) {
+    this.#token = token;
+    this.#fetch = fetchImpl;
+  }
+
+  async #call<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const res = await this.#fetch(path, {
+      method,
+      headers: {
+        authorization: `Bearer ${this.#token}`,
+        ...(body !== undefined ? { "content-type": "application/json" } : {}),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      cache: "no-store",
+      credentials: "omit",
+    });
+    let json: unknown;
+    try {
+      json = await res.json();
+    } catch {
+      json = undefined;
+    }
+    if (!res.ok) {
+      if (res.status === 401) this.onUnauthorized?.();
+      const code = (json as { error?: string } | undefined)?.error ?? "request_failed";
+      throw new ApiError(res.status, code, json);
+    }
+    return json as T;
+  }
+
+  get<T>(path: string, q: Q = {}): Promise<T> {
+    return this.#call<T>("GET", `${path}${apiQuery(q)}`);
+  }
+
+  // ---- typed endpoints ----
+  health = () => fetch("/healthz", { cache: "no-store" }).then((r) => r.json() as Promise<Record<string, unknown>>);
+  handshake = () => this.get<Record<string, unknown>>("/v1/bridge/handshake");
+  stats = (q: Q) => this.get<LabStats & { generated_at: number }>("/v1/stats", q);
+  sessions = (q: Q) => this.get<{ total: number; sessions: SessionSummary[] }>("/v1/sessions", q);
+  session = (id: string) => this.get<{ session: SessionRecord; eventCount: number }>(`/v1/sessions/${encodeURIComponent(id)}`);
+  analysis = (id: string) => this.get<AnalysisResult>(`/v1/sessions/${encodeURIComponent(id)}/analysis`);
+  events = (q: Q) => this.get<{ total: number; events: StoredEventRow[] }>("/v1/events", q);
+  event = (id: string) => this.get<{ event: StoredEventRow }>(`/v1/events/${encodeURIComponent(id)}`);
+  findings = (q: Q) => this.get<{ total: number; findings: Finding[] }>("/v1/findings", q);
+  finding = (id: string) => this.get<FindingDetail>(`/v1/findings/${encodeURIComponent(id)}`);
+  compare = (a: string, b: string) => this.get<SessionComparison>("/v1/analysis/compare", { a, b });
+  graph = (sessions?: string[]) => this.get<WorkflowGraph>("/v1/analysis/graph", { sessions: sessions?.join(",") });
+  environments = (sessions?: string[]) => this.get<{ environments: EnvironmentReport[] }>("/v1/analysis/environment", { sessions: sessions?.join(",") });
+  runs = (q: Q) => this.get<{ total: number; runs: ReplayRunSummary[] }>("/v1/runs", q);
+  run = (id: string) => this.get<{ run: RunRecord }>(`/v1/runs/${encodeURIComponent(id)}`);
+  rules = () => this.get<RulesInfo>("/v1/analysis/rules");
+  putRules = (rules: unknown) => this.#call<{ source: string; version: string; rules: number }>("PUT", "/v1/analysis/rules", rules);
+  resetRules = () => this.#call<{ source: string; version: string }>("DELETE", "/v1/analysis/rules");
+  runAnalysis = (sessionIds?: string[]) => this.#call<AnalysisRunSummary>("POST", "/v1/analysis/run", sessionIds ? { sessionIds } : {});
+}

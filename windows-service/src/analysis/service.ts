@@ -9,6 +9,9 @@ import { fileURLToPath } from "node:url";
 
 import {
   type AnalysisResult,
+  type AnalysisRunSummary,
+  type EnvironmentReport,
+  type RulesInfo,
   type RuleSet,
   type SessionComparison,
   type ValidationResult,
@@ -17,7 +20,7 @@ import {
 } from "../shared.ts";
 import type { Store } from "../db/store.ts";
 import { type SessionData, sessionData } from "./model.ts";
-import { analyzeCohort, cohortGraph, compare, rulesVersion } from "./analyzer.ts";
+import { analyzeCohort, cohortGraph, compare, environmentReport, rulesVersion } from "./analyzer.ts";
 
 const DEFAULT_RULES_FILE = fileURLToPath(new URL("./rules/default-rules.json", import.meta.url));
 
@@ -37,12 +40,8 @@ export interface AnalysisServiceOptions {
   now?: () => number;
 }
 
-export interface RunSummary {
-  sessions: number;
-  findings: number;
-  rules_version: string;
-  warnings: string[];
-}
+/** POST /v1/analysis/run result (contract: shared AnalysisRunSummary). */
+export type RunSummary = AnalysisRunSummary;
 
 export class AnalysisService {
   #store: Store;
@@ -78,7 +77,7 @@ export class AnalysisService {
     return this.#rules;
   }
 
-  rulesInfo(): { source: "default" | "custom"; version: string; error: string | null; rules: RuleSet } {
+  rulesInfo(): RulesInfo {
     return { source: this.#source, version: rulesVersion(this.#rules), error: this.#rulesError ?? null, rules: this.#rules };
   }
 
@@ -147,6 +146,10 @@ export class AnalysisService {
     const da = this.sessionData(a);
     const db = this.sessionData(b);
     return da && db ? compare(da, db) : undefined;
+  }
+
+  environments(ids?: readonly string[]): EnvironmentReport[] {
+    return this.#load(ids && ids.length > 0 ? ids : this.#recentIds()).map(environmentReport);
   }
 
   graph(ids?: readonly string[]): WorkflowGraph {

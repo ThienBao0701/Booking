@@ -4,5 +4,5 @@ export { segmentSession, timingSummary, repeatedSequences, workflowGraph, workfl
 export { compareSessions, extractEnvironment, environmentDifferences, lcs } from "./compare.ts";
 export { evaluateRule, matches, MAX_MATCHES_PER_RULE, type EvalContext, type RuleMatch } from "./rules/engine.ts";
 export { buildFinding, findingId, render } from "./findings.ts";
-export { analyzeCohort, analyzeSession, compare, cohortGraph, rulesVersion, type AnalyzeOptions } from "./analyzer.ts";
+export { analyzeCohort, analyzeSession, compare, cohortGraph, environmentReport, rulesVersion, type AnalyzeOptions } from "./analyzer.ts";
 export { AnalysisService, loadDefaultRules, type RunSummary } from "./service.ts";

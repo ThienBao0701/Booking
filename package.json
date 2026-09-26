@@ -2,7 +2,7 @@
   "name": "stealth-browser-automation-lab",
   "version": "0.1.0",
   "private": true,
-  "description": "Local diagnostics & authorized-automation lab: observe, reproduce, analyze and debug your own browser/Extranet workflows against a bundled mock environment — never on a live production account.",
+  "description": "Local diagnostics & authorized-automation lab: observe, reproduce, analyze and debug your own browser/Extranet workflows against a bundled mock environment \u2014 never on a live production account.",
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "node": ">=22.0.0"
@@ -25,16 +25,16 @@
   },
   "scripts": {
     "lint": "node --experimental-strip-types scripts/lint.mjs",
-    "typecheck": "tsc --noEmit -p shared/tsconfig.json && tsc --noEmit -p windows-service/tsconfig.json && tsc --noEmit -p mock-extranet/tsconfig.json && tsc --noEmit -p extension/tsconfig.json && tsc --noEmit -p extension/tsconfig.test.json && tsc --noEmit -p tests/tsconfig.json",
+    "typecheck": "tsc --noEmit -p shared/tsconfig.json && tsc --noEmit -p windows-service/tsconfig.json && tsc --noEmit -p mock-extranet/tsconfig.json && tsc --noEmit -p extension/tsconfig.json && tsc --noEmit -p extension/tsconfig.test.json && tsc --noEmit -p tests/tsconfig.json && tsc --noEmit -p dashboard/tsconfig.json",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "node --test --experimental-strip-types --experimental-sqlite shared/test/*.test.ts windows-service/test/*.test.ts mock-extranet/test/*.test.ts extension/test/*.test.ts",
+    "test:unit": "node --test --experimental-strip-types --experimental-sqlite shared/test/*.test.ts windows-service/test/*.test.ts mock-extranet/test/*.test.ts extension/test/*.test.ts dashboard/test/*.test.ts",
     "test:shared": "node --test --experimental-strip-types shared/test/*.test.ts",
     "test:service": "node --test --experimental-strip-types --experimental-sqlite windows-service/test/*.test.ts",
     "test:mock": "node --test --experimental-strip-types mock-extranet/test/*.test.ts",
     "test:extension": "node --test --experimental-strip-types extension/test/*.test.ts",
     "test:e2e": "node --test --test-concurrency=1 --experimental-strip-types --experimental-sqlite tests/e2e/*.test.ts",
     "test:core": "npm run test:unit",
-    "build": "node --experimental-strip-types extension/build.mjs",
+    "build": "node --experimental-strip-types extension/build.mjs && node --experimental-strip-types dashboard/build.mjs",
     "build:extension": "node --experimental-strip-types extension/build.mjs",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
     "start:service": "node --experimental-strip-types --experimental-sqlite windows-service/src/index.ts",
@@ -42,7 +42,10 @@
     "start:mock": "node --experimental-strip-types mock-extranet/src/index.ts",
     "replay": "node --experimental-strip-types --experimental-sqlite windows-service/src/automation/cli.ts",
     "replay:example": "node --experimental-strip-types --experimental-sqlite windows-service/src/automation/cli.ts examples/workflows/mock-full-flow.json --params-file examples/workflows/mock-full-flow.params.json",
-    "test:browser": "node --test --test-concurrency=1 --experimental-strip-types --experimental-sqlite tests/browser/*.test.ts"
+    "test:browser": "node --test --test-concurrency=1 --experimental-strip-types --experimental-sqlite tests/browser/*.test.ts",
+    "test:dashboard": "node --test --experimental-strip-types dashboard/test/*.test.ts",
+    "build:dashboard": "node --experimental-strip-types dashboard/build.mjs",
+    "dashboard:url": "node --experimental-strip-types scripts/dashboard-url.mjs"
   },
   "keywords": [
     "diagnostics",

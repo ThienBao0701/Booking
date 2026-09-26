@@ -30,6 +30,8 @@ jobs:
         run: node --test --experimental-strip-types mock-extranet/test/*.test.ts
       - name: Unit test — extension (recorder, bridge, capture, config, manifest)
         run: node --test --experimental-strip-types extension/test/*.test.ts
+      - name: Unit test — dashboard (formatting, routing, token handling, chart layout)
+        run: node --test --experimental-strip-types dashboard/test/*.test.ts
       - name: E2E — bridge, controller, replay against mock-extranet on 127.0.0.1:4599
         run: node --test --test-concurrency=1 --experimental-strip-types --experimental-sqlite tests/e2e/*.test.ts
 
@@ -50,6 +52,8 @@ jobs:
         run: pnpm run typecheck
       - name: Build extension (bundle + artifact verification)
         run: pnpm run build:extension
+      - name: Build dashboard (bundle + no-HTML-sink verification)
+        run: pnpm run build:dashboard
       - name: Smoke — service and mock boot and report healthy
         run: |
           export LAB_DATA_DIR="$RUNNER_TEMP/lab" LAB_SERVICE_PORT=4577
@@ -61,6 +65,7 @@ jobs:
           done
           curl -fsS http://127.0.0.1:4577/healthz
           curl -fsS http://127.0.0.1:4599/healthz
+          curl -fsSI http://127.0.0.1:4577/dashboard/ | grep -i "content-security-policy: default-src 'none'"
       - name: Upload extension artifact
         uses: actions/upload-artifact@v4
         with:

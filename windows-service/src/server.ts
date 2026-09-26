@@ -18,6 +18,7 @@ import {
   validateEventBatch,
   fromLabEvent,
   isLoopbackUrl,
+  isWorkflowLabel,
   DEFAULT_SAFETY_MODE,
   CONTRACT_VERSION,
   LAB_VERSION,
@@ -26,6 +27,9 @@ import { recordingToWorkflow } from "./automation/convert.ts";
 import { HttpError, MAX_BODY_BYTES, readBody, send } from "./http.ts";
 import { AnalysisService } from "./analysis/service.ts";
 import { routeAnalysis } from "./routes/analysis.ts";
+import { routeQuery } from "./routes/query.ts";
+import { serveDashboard } from "./routes/dashboard.ts";
+import { intParam, searchParam } from "./routes/params.ts";
 
 /** Max events accepted per POST /v1/events (request validation; bridge batches below this). */
 export const MAX_BATCH_EVENTS = 500;
@@ -68,11 +72,22 @@ export function createApiServer(ctx: Ctx): Server {
       return done(403, { reason: "host" });
     }
 
-    // 2) Origin validation.
+    // 2) Origin validation. The service's own origin (the dashboard it serves,
+    //    ADR-0006) is derived from the Host header validated above.
     const origin = req.headers.origin;
-    if (!isOriginAllowed({ origin, allowedOrigins: config.allowedOrigins })) {
+    const selfOrigin = `http://${String(req.headers.host).trim()}`;
+    if (!isOriginAllowed({ origin, allowedOrigins: config.allowedOrigins, selfOrigin })) {
       send(res, 403, { error: "forbidden_origin" });
       return done(403, { reason: "origin" });
+    }
+
+    // 2b) Static dashboard files (no data; the API below still needs the token).
+    if ((method === "GET" || method === "HEAD") && (path === "/" || path === "/dashboard" || path.startsWith("/dashboard/"))) {
+      if (!limiter.allow(`static:${path === "/" ? "/" : "/dashboard"}`)) {
+        send(res, 429, { error: "rate_limited" });
+        return done(429);
+      }
+      return done(serveDashboard(config.dashboardDir, method, path, res));
     }
 
     // 3) Health check bypasses auth (watchdog liveness).
@@ -181,9 +196,19 @@ async function route(
     return 200;
   }
 
-  // GET /v1/sessions
+  // GET /v1/sessions?from=&to=&q=&workflow=&limit=&offset= — summaries, newest first
   if (method === "GET" && path === "/v1/sessions") {
-    send(res, 200, { sessions: store.listSessions() });
+    const workflow = url.searchParams.get("workflow") ?? "";
+    if (workflow !== "" && !isWorkflowLabel(workflow)) throw new HttpError(400, "invalid_workflow");
+    const out = store.listSessionSummaries({
+      from: intParam(url, "from"),
+      to: intParam(url, "to"),
+      q: searchParam(url),
+      workflow: workflow || undefined,
+      limit: intParam(url, "limit"),
+      offset: intParam(url, "offset"),
+    });
+    send(res, 200, out);
     return 200;
   }
 
@@ -309,6 +334,10 @@ async function route(
   // Analysis, findings and rule configuration (Phase 8).
   const handled = await routeAnalysis(ctx, method, path, url, req, res);
   if (handled !== undefined) return handled;
+
+  // Dashboard read queries (Phase 9).
+  const queried = await routeQuery(ctx, method, path, url, req, res);
+  if (queried !== undefined) return queried;
 
   send(res, 404, { error: "not_found" });
   return 404;

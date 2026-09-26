@@ -1,13 +1,14 @@
 # 01 — Architecture
 
-Status: **v1.1** (Phases 0–8 implemented) · Scope: local, single-operator diagnostics lab.
+Status: **v1.1** (Phases 0–9 implemented) · Scope: local, single-operator diagnostics lab.
 
 This document is the source of truth for structure and boundaries. Any change
 to the boundaries below must be proposed as an ADR (see `docs/adr/`) before
 implementation. v1.1 changes are recorded in
 [ADR-0004](adr/0004-automation-engine-and-target-hardening.md); the analyzer
 (within the existing boundaries) in
-[ADR-0005](adr/0005-analyzer-rule-engine-and-findings.md).
+[ADR-0005](adr/0005-analyzer-rule-engine-and-findings.md); the dashboard's
+hosting and origin rule in [ADR-0006](adr/0006-dashboard-serving-and-self-origin.md).
 
 ## 1. Purpose
 
@@ -53,7 +54,7 @@ Local Background Service (windows-service/)                   [Phase 3]
    │                                   │
    ▼                                   ▼
 Analyzer · Dashboard · Reports   Mock Extranet (mock-extranet/)   [Phase 5]
-   [8: windows-service/src/analysis, 9–10 planned]
+   [8: windows-service/src/analysis · 9: dashboard/ at /dashboard/ · 10 planned]
                                   safe target; emits workflow events
 ```
 
@@ -95,12 +96,13 @@ Analyzer · Dashboard · Reports   Mock Extranet (mock-extranet/)   [Phase 5]
 | `extension`        | MV3 capture, redaction-at-source, recorder, bridge client  | `shared`          |
 | `windows-service`  | localhost API, event bus, SQLite, logs, watchdog, automation engine (controller host), analyzer + rule engine | `shared` |
 | `mock-extranet`    | Safe automation target that emits production-shaped events  | `shared`          |
-| `dashboard`        | Read/visualize; trigger authorized replays (planned)        | `shared`          |
+| `dashboard`        | Static SPA served by the service at `/dashboard/`: read/visualize sessions, timelines, workflows, events, findings, environment, runs; edit analysis rules (ADR-0006). Triggering replays stays planned. | `shared`          |
 
 **Import rule (enforced by `scripts/lint.mjs` in CI):** everything depends on
 `shared`, only through each package's `src/shared.ts`; `shared` depends on
-nothing internal and no `node:` builtins; extension code imports no `node:`
-builtins; no sibling package imports another (they communicate over the
+nothing internal and no `node:` builtins; extension and dashboard code import
+no `node:` builtins; dashboard code uses no HTML-injection sinks; no sibling
+package imports another (they communicate over the
 service API). Test harnesses (`*/test`, `tests/`) may compose packages.
 
 `shared` is the single place where the *event schema*, *recorder schema*,

@@ -11,38 +11,13 @@ import type { Store } from "../db/store.ts";
 import type { AnalysisService } from "../analysis/service.ts";
 import { FINDING_CATEGORIES, SEVERITIES, isWorkflowLabel } from "../shared.ts";
 import { HttpError, readBody, send } from "../http.ts";
+import { ID_RE, enumParam, intParam, sessionIdList } from "./params.ts";
+
+export { MAX_ANALYSIS_SESSIONS } from "./params.ts";
 
 export interface AnalysisRouteCtx {
   store: Store;
   analysis: AnalysisService;
-}
-
-/** Max sessions accepted in one run / graph request. */
-export const MAX_ANALYSIS_SESSIONS = 200;
-const ID_RE = /^[A-Za-z0-9_.:-]{1,128}$/;
-
-function sessionIdList(raw: unknown, field: string): string[] | undefined {
-  if (raw === undefined || raw === null) return undefined;
-  const list = typeof raw === "string" ? raw.split(",").filter((s) => s.length > 0) : raw;
-  if (!Array.isArray(list)) throw new HttpError(400, `${field}_must_be_list`);
-  if (list.length > MAX_ANALYSIS_SESSIONS) throw new HttpError(400, `${field}_too_many`);
-  for (const id of list) if (typeof id !== "string" || !ID_RE.test(id)) throw new HttpError(400, `${field}_invalid_id`);
-  return [...new Set(list as string[])];
-}
-
-function intParam(url: URL, name: string): number | undefined {
-  const v = url.searchParams.get(name);
-  if (v === null || v === "") return undefined;
-  const n = Number(v);
-  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) throw new HttpError(400, `invalid_${name}`);
-  return n;
-}
-
-function enumParam(url: URL, name: string, allowed: readonly string[]): string | undefined {
-  const v = url.searchParams.get(name);
-  if (v === null || v === "") return undefined;
-  if (!allowed.includes(v)) throw new HttpError(400, `invalid_${name}`);
-  return v;
 }
 
 /** Returns the status sent, or undefined when the path is not an analysis route. */
@@ -95,6 +70,13 @@ export async function routeAnalysis(
   if (method === "GET" && path === "/v1/analysis/graph") {
     const ids = sessionIdList(url.searchParams.get("sessions") ?? undefined, "sessions");
     send(res, 200, analysis.graph(ids));
+    return 200;
+  }
+
+  // GET /v1/analysis/environment?sessions=a,b — environment reports (derived from events)
+  if (method === "GET" && path === "/v1/analysis/environment") {
+    const ids = sessionIdList(url.searchParams.get("sessions") ?? undefined, "sessions");
+    send(res, 200, { environments: analysis.environments(ids) });
     return 200;
   }
 

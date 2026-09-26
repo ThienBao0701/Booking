@@ -66,6 +66,15 @@ Load `extension/dist` as an unpacked extension and pair it with the token — se
    pnpm run replay examples/workflows/mock-full-flow.json --dry-run --params-file examples/workflows/mock-full-flow.params.json
    ```
 
+## 6. Open the dashboard
+
+```bash
+pnpm run build            # extension + dashboard
+pnpm run dashboard:url    # → http://127.0.0.1:4577/dashboard/#token=…
+```
+
+See [15 — Dashboard](15-dashboard.md).
+
 ## Configuration (environment)
 
 | Variable | Default | Notes |
@@ -77,6 +86,7 @@ Load `extension/dist` as an unpacked extension and pair it with the token — se
 | `LAB_SAFETY_MODE` | `OBSERVE` | reported to the extension via health/handshake |
 | `LAB_ALLOWED_ORIGINS` | *(any extension)* | comma list, e.g. `chrome-extension://<id>` to pin |
 | `LAB_LOG_LEVEL` | `info` | `debug` · `info` · `warn` · `error` |
+| `LAB_DASHBOARD_DIR` | `dashboard/dist` | built dashboard served at `/dashboard/` |
 | `MOCK_EXTRANET_HOST` / `_PORT` | `127.0.0.1` / `4599` | mock |
 | `MOCK_EXTRANET_URL` | `http://127.0.0.1:4599` | E2E target (must be loopback) |
 

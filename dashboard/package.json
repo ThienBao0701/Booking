@@ -1,0 +1,12 @@
+{
+  "name": "@lab/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local forensic dashboard (static SPA served by the lab service at /dashboard/). Vanilla TypeScript, no runtime dependencies; talks to the service only over its authenticated /v1 API.",
+  "type": "module",
+  "scripts": {
+    "build": "node --experimental-strip-types build.mjs",
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

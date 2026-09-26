@@ -47,3 +47,6 @@ export { validateWorkflowFile, authorizeRun } from "./replay/validate.ts";
 export * from "./analysis/types.ts";
 export * from "./analysis/language.ts";
 export { validateRule, validateRuleSet, validateFinding } from "./analysis/validate.ts";
+
+// Read-API response contracts (service ↔ dashboard, ADR-0006).
+export * from "./api/types.ts";

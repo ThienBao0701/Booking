@@ -26,7 +26,10 @@ All service endpoints:
 3. **Origin / Host validation** — the `Host` header must be exactly the bound
    loopback host:port (defense against DNS rebinding); any web (`http(s)://`)
    `Origin` is rejected with `403`. Extension origins are accepted; pin to one
-   extension with `LAB_ALLOWED_ORIGINS=chrome-extension://<id>`.
+   extension with `LAB_ALLOWED_ORIGINS=chrome-extension://<id>`. The one web
+   origin accepted is the service's **own** origin (`http://<validated Host>`),
+   which only the dashboard it serves carries (ADR-0006); other local origins
+   — the mock on 4599, dev servers — remain rejected.
 4. **Rate limiting** — fixed-window counter per (token, route); excess → `429`.
 5. **CSRF protection** — every state-changing route requires the bearer token
    in the `Authorization` header, which a cross-site form or `fetch` cannot
@@ -41,7 +44,15 @@ All service endpoints:
    (duplicates reported, not re-stored), so client retries are always safe.
 9. **Structured logging** — every request logged as JSON (method, route,
    status, latency) to rolling logs; tokens are never logged.
-10. **Analysis routes** (Phase 8) use the same pipeline. Query parameters are
+10. **Dashboard** (Phase 9, ADR-0006) — `GET`/`HEAD` `/dashboard/*` serves
+   static files without the token (they contain no data) with a strict CSP,
+   `X-Frame-Options: DENY`, `no-referrer`, `nosniff`, COOP/CORP; paths are
+   decoded, `..`/NUL/backslash/hidden segments rejected, an extension
+   allow-list applied, and the resolved `realpath` confined to the dashboard
+   directory. Every data request still needs the bearer token. The token
+   reaches the page via the URL fragment (never sent to a server) and lives in
+   `sessionStorage`; no cookies, so CSRF remains impossible.
+11. **Analysis routes** (Phase 8) use the same pipeline. Query parameters are
    validated (enums, integers, id charset, ≤ 200 session ids per request).
    `PUT /v1/analysis/rules` validates the rule set fail-closed (including the
    non-conclusive language guard and a 200-character regex cap) before an

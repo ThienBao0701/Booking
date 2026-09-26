@@ -7,15 +7,16 @@
 | Unit — shared contracts, safety, redaction | `shared/test` | `pnpm run test:shared` | no |
 | Unit + integration — service (auth, security, store, ingestion, watchdog, controller, replay engine, converter, routes, analyzer, rule engine, comparison, analysis API) | `windows-service/test` | `pnpm run test:service` | no |
 | Unit + integration — mock Extranet | `mock-extranet/test` | `pnpm run test:mock` | no |
-| Unit — extension (recorder, bridge, capture, config, manifest policy) | `extension/test` | `pnpm run test:extension` | no |
+| Unit — extension (recorder, bridge, capture, config, manifest policy, environment) | `extension/test` | `pnpm run test:extension` | no |
+| Unit — dashboard (formatting, routing, token handling, chart geometry) | `dashboard/test` | `pnpm run test:dashboard` | no |
 | E2E — bridge, controller, replay on the mock at 127.0.0.1:4599 | `tests/e2e` | `pnpm run test:e2e` | no |
-| Real-browser E2E — built extension in Chromium | `tests/browser` | `pnpm run test:browser` | Chromium (skips without) |
+| Real-browser E2E — built extension and dashboard in Chromium | `tests/browser` | `pnpm run test:browser` | Chromium (skips without) |
 
 `pnpm run test` = unit + E2E. `pnpm run verify` = lint + typecheck + test + build.
 
-Counts at this revision: **254 unit** (62 shared · 119 service · 11 mock ·
-62 extension), **13 E2E**, **2 real-browser**. Earlier tests are unchanged and
-still pass.
+Counts at this revision: **275 unit** (62 shared · 128 service · 11 mock ·
+62 extension · 12 dashboard), **13 E2E**, **10 real-browser** (2 extension ·
+8 dashboard). Earlier tests are unchanged and still pass.
 
 ## What the E2E suites prove
 
@@ -53,6 +54,28 @@ still pass.
   migrates additively; every finding's event ids resolve over
   `GET /v1/findings/:id`; auth/origin/validation on every analysis route;
   auto-analysis on session end is deferred and coalesced.
+
+## What the dashboard suites prove (Phase 9)
+
+- **Service:** the static route serves only files inside the dashboard
+  directory (traversal, encoded traversal, backslashes, NUL, hidden files,
+  unknown types and symlink escapes → 404), with the CSP and anti-framing
+  headers; `503` when not built; the API still needs the token; exactly the
+  service's own origin is accepted while other local origins (the mock's
+  port, neighbouring ports) are rejected; stats, event search, runs,
+  environment and session summaries return correct counts and reject bad
+  parameters with `400`.
+- **Dashboard units:** routes/filters round-trip; the token is taken only
+  from `#token=`, validated and scrubbed; only in-app/same-origin hrefs are
+  rendered; tick, arc-diagram and timeline geometry (including packing of
+  overlapping findings) are deterministic.
+- **Browser (Chromium):** token leaves the address bar and lands in
+  `sessionStorage`; all pages render with zero console errors or failed
+  requests; filters narrow results; the event drawer opens by click and by
+  keyboard and lists the findings that cite the event; recorded markup
+  (`<script>…`) is shown as text; a finding's evidence lists exactly its
+  `event_ids`; timeline ticks/bands match stored events/findings; the workflow
+  graph and session comparison are interactive.
 
 ## The mock at 127.0.0.1:4599
 

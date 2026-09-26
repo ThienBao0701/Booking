@@ -28,14 +28,22 @@ export function isHostAllowed({ hostHeader, expectedHost, expectedPort }: HostCh
 export interface OriginCheckInput {
   origin: string | undefined;
   allowedOrigins: string[];
+  /**
+   * This service's own origin, `http://<Host>` built from the request's
+   * already-validated loopback Host header (ADR-0006). Only pages the service
+   * itself serves (the dashboard) carry it.
+   */
+  selfOrigin?: string;
 }
 
 /**
- * Allow: absent Origin (non-browser / native messaging), or an allow-listed
- * chrome-extension:// origin. Reject any http(s) web origin outright.
+ * Allow: absent Origin (non-browser / native messaging), an allow-listed
+ * chrome-extension:// origin, or exactly the service's own origin. Reject any
+ * other http(s) web origin outright (including other local ports).
  */
-export function isOriginAllowed({ origin, allowedOrigins }: OriginCheckInput): boolean {
+export function isOriginAllowed({ origin, allowedOrigins, selfOrigin }: OriginCheckInput): boolean {
   if (origin === undefined || origin === "" || origin === "null") return true;
+  if (selfOrigin !== undefined && origin.toLowerCase() === selfOrigin.toLowerCase()) return true;
   if (origin.startsWith("chrome-extension://") || origin.startsWith("moz-extension://")) {
     // If an allow-list is configured, enforce it; otherwise accept any extension.
     if (allowedOrigins.length === 0) return true;

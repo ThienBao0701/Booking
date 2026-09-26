@@ -10,6 +10,10 @@ import { dirname } from "node:path";
 import {
   type Finding,
   type LabEvent,
+  type LabStats,
+  type ReplayRunSummary,
+  type SessionSummary,
+  type StoredEventRow,
   type SessionRecord,
   type RunRecord,
   redactValue,
@@ -31,6 +35,42 @@ export interface FindingFilter {
 }
 import { ADDED_COLUMNS, ADDED_INDEXES, DDL, PRAGMAS, SCHEMA_VERSION } from "./schema.ts";
 
+export interface SessionFilter {
+  from?: number | undefined;
+  to?: number | undefined;
+  q?: string | undefined;
+  workflow?: string | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
+}
+
+export interface EventFilter {
+  sessionId?: string | undefined;
+  kind?: string | undefined;
+  workflow?: string | undefined;
+  severity?: string | undefined;
+  category?: string | undefined;
+  /** Case-insensitive substring over the (redacted) payload, id and kind. */
+  q?: string | undefined;
+  from?: number | undefined;
+  to?: number | undefined;
+  order?: "asc" | "desc" | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
+}
+
+/** LIKE pattern for a user search term (LIKE wildcards stripped). */
+function likePattern(q: string): string {
+  return `%${q.toLowerCase().replace(/[%_]/g, "")}%`;
+}
+
+function clampLimit(limit: number | undefined, fallback: number): number {
+  return Math.max(1, Math.min(500, limit ?? fallback));
+}
+
+// Row contracts live in shared (ADR-0006); re-exported for existing importers.
+export type { LabStats, ReplayRunSummary, SessionSummary, StoredEventRow };
+
 export interface NewSession {
   id: string;
   startedAt: number;
@@ -38,20 +78,6 @@ export interface NewSession {
   targetKind: string;
   targetHost?: string;
   metadata?: Record<string, unknown>;
-}
-
-export interface StoredEventRow {
-  id: string;
-  session_id: string;
-  seq: number;
-  ts: number;
-  tab_id: number | null;
-  kind: string;
-  category: string;
-  workflow: string | null;
-  severity: string;
-  redacted: number;
-  data: string;
 }
 
 export class Store {
@@ -429,6 +455,175 @@ export class Store {
       out.push(...rows);
     }
     return out;
+  }
+
+  // ---- dashboard queries (read-only; ADR-0006) ----
+
+  /** Session list with per-session counts, newest first. */
+  listSessionSummaries(filter: SessionFilter = {}): { total: number; sessions: SessionSummary[] } {
+    const where: string[] = [];
+    const args: Array<string | number> = [];
+    if (filter.from !== undefined) {
+      where.push("COALESCE(s.ended_at, s.started_at) >= ?");
+      args.push(filter.from);
+    }
+    if (filter.to !== undefined) {
+      where.push("s.started_at <= ?");
+      args.push(filter.to);
+    }
+    if (filter.q) {
+      where.push("(lower(s.id) LIKE ? OR lower(COALESCE(s.target_host,'')) LIKE ? OR lower(s.mode) LIKE ?)");
+      const like = likePattern(filter.q);
+      args.push(like, like, like);
+    }
+    if (filter.workflow) {
+      where.push("EXISTS (SELECT 1 FROM events w WHERE w.session_id = s.id AND w.workflow = ?)");
+      args.push(filter.workflow);
+    }
+    const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const total = (this.#db.prepare(`SELECT COUNT(*) AS n FROM sessions s ${clause}`).get(...args) as { n: number }).n;
+    const rows = this.#db
+      .prepare(
+        `SELECT s.*,
+           (SELECT COUNT(*) FROM events e WHERE e.session_id = s.id) AS event_count,
+           (SELECT COUNT(*) FROM events e WHERE e.session_id = s.id AND e.severity = 'error') AS error_count,
+           (SELECT COUNT(*) FROM findings f WHERE f.session_id = s.id) AS finding_count
+         FROM sessions s ${clause} ORDER BY s.started_at DESC LIMIT ? OFFSET ?`,
+      )
+      .all(...args, clampLimit(filter.limit, 100), Math.max(0, filter.offset ?? 0)) as Array<Record<string, unknown>>;
+    return {
+      total,
+      sessions: rows.map((r) => ({
+        id: r.id as string,
+        startedAt: r.started_at as number,
+        endedAt: (r.ended_at as number | null) ?? null,
+        mode: r.mode as string,
+        targetKind: r.target_kind as string,
+        targetHost: (r.target_host as string | null) ?? null,
+        eventCount: r.event_count as number,
+        errorCount: r.error_count as number,
+        findingCount: r.finding_count as number,
+      })),
+    };
+  }
+
+  /** Cross-session event search (redacted rows as stored). */
+  queryEvents(filter: EventFilter = {}): { total: number; events: StoredEventRow[] } {
+    const where: string[] = [];
+    const args: Array<string | number> = [];
+    const eq = (col: string, v: string | undefined) => {
+      if (v) {
+        where.push(`${col} = ?`);
+        args.push(v);
+      }
+    };
+    eq("session_id", filter.sessionId);
+    eq("kind", filter.kind);
+    eq("workflow", filter.workflow);
+    eq("severity", filter.severity);
+    eq("category", filter.category);
+    if (filter.from !== undefined) {
+      where.push("ts >= ?");
+      args.push(filter.from);
+    }
+    if (filter.to !== undefined) {
+      where.push("ts <= ?");
+      args.push(filter.to);
+    }
+    if (filter.q) {
+      where.push("(lower(data) LIKE ? OR lower(id) LIKE ? OR lower(kind) LIKE ?)");
+      const like = likePattern(filter.q);
+      args.push(like, like, like);
+    }
+    const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const total = (this.#db.prepare(`SELECT COUNT(*) AS n FROM events ${clause}`).get(...args) as { n: number }).n;
+    const order = filter.order === "asc" ? "ASC" : "DESC";
+    const events = this.#db
+      .prepare(`SELECT * FROM events ${clause} ORDER BY ts ${order}, seq ${order} LIMIT ? OFFSET ?`)
+      .all(...args, clampLimit(filter.limit, 200), Math.max(0, filter.offset ?? 0)) as unknown as StoredEventRow[];
+    return { total, events };
+  }
+
+  /** Aggregates for the dashboard overview. `tzOffsetMin` buckets days in local time. */
+  stats(filter: { from?: number | undefined; to?: number | undefined; tzOffsetMin?: number | undefined } = {}): LabStats {
+    const args: number[] = [];
+    if (filter.from !== undefined) args.push(filter.from);
+    if (filter.to !== undefined) args.push(filter.to);
+    // Range predicate over [startCol, endCol] overlapping [from, to]; args are (from?, to?).
+    const range = (startCol: string, endCol = startCol) => {
+      const parts: string[] = [];
+      if (filter.from !== undefined) parts.push(`${endCol} >= ?`);
+      if (filter.to !== undefined) parts.push(`${startCol} <= ?`);
+      return parts.length ? `WHERE ${parts.join(" AND ")}` : "";
+    };
+    const evWhere = range("ts");
+    const sWhere = range("started_at", "COALESCE(ended_at, started_at)");
+    const fWhere = range("first_ts", "last_ts");
+    const rWhere = range("started_at", "COALESCE(ended_at, started_at)");
+    const offsetMs = Math.round((filter.tzOffsetMin ?? 0) * 60_000);
+    const count = (sql: string, a: number[] = args) => (this.#db.prepare(sql).get(...a) as { n: number }).n;
+    const group = (sql: string, a: number[] = args) =>
+      Object.fromEntries((this.#db.prepare(sql).all(...a) as Array<{ k: string | null; n: number }>).map((r) => [r.k ?? "UNKNOWN", r.n]));
+    return {
+      sessions: count(`SELECT COUNT(*) AS n FROM sessions ${sWhere}`),
+      events: count(`SELECT COUNT(*) AS n FROM events ${evWhere}`),
+      findings: count(`SELECT COUNT(*) AS n FROM findings ${fWhere}`),
+      runs: count(`SELECT COUNT(*) AS n FROM runs ${rWhere}`),
+      events_by_kind: group(`SELECT kind AS k, COUNT(*) AS n FROM events ${evWhere} GROUP BY kind ORDER BY n DESC`),
+      events_by_workflow: group(`SELECT workflow AS k, COUNT(*) AS n FROM events ${evWhere} GROUP BY workflow ORDER BY n DESC`),
+      events_by_severity: group(`SELECT severity AS k, COUNT(*) AS n FROM events ${evWhere} GROUP BY severity`),
+      findings_by_severity: group(`SELECT COALESCE(severity,'info') AS k, COUNT(*) AS n FROM findings ${fWhere} GROUP BY k`),
+      findings_by_category: group(`SELECT COALESCE(category,'EVENT_SEQUENCE') AS k, COUNT(*) AS n FROM findings ${fWhere} GROUP BY k ORDER BY n DESC`),
+      runs_by_status: group(`SELECT status AS k, COUNT(*) AS n FROM runs ${rWhere} GROUP BY status`),
+      events_by_day: (
+        this.#db
+          .prepare(`SELECT date((ts + ?) / 1000, 'unixepoch') AS day, COUNT(*) AS n FROM events ${evWhere} GROUP BY day ORDER BY day`)
+          .all(offsetMs, ...args) as Array<{ day: string; n: number }>
+      ).map((r) => ({ day: r.day, count: r.n })),
+    };
+  }
+
+  /** Replay runs, newest first, with step outcome counts (no step detail). */
+  listRuns(filter: { status?: string | undefined; workflow?: string | undefined; limit?: number | undefined; offset?: number | undefined } = {}): {
+    total: number;
+    runs: ReplayRunSummary[];
+  } {
+    const where: string[] = [];
+    const args: Array<string | number> = [];
+    if (filter.status) {
+      where.push("r.status = ?");
+      args.push(filter.status);
+    }
+    if (filter.workflow) {
+      where.push("r.workflow = ?");
+      args.push(filter.workflow);
+    }
+    const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const total = (this.#db.prepare(`SELECT COUNT(*) AS n FROM runs r ${clause}`).get(...args) as { n: number }).n;
+    const rows = this.#db
+      .prepare(
+        `SELECT r.*,
+           (SELECT COUNT(*) FROM run_steps s WHERE s.run_id = r.run_id) AS steps_total,
+           (SELECT COUNT(*) FROM run_steps s WHERE s.run_id = r.run_id AND s.status = 'ok') AS steps_ok,
+           (SELECT COUNT(*) FROM run_steps s WHERE s.run_id = r.run_id AND s.status = 'failed') AS steps_failed
+         FROM runs r ${clause} ORDER BY r.started_at DESC LIMIT ? OFFSET ?`,
+      )
+      .all(...args, clampLimit(filter.limit, 100), Math.max(0, filter.offset ?? 0)) as Array<Record<string, unknown>>;
+    return {
+      total,
+      runs: rows.map((r) => ({
+        runId: r.run_id as string,
+        workflow: r.workflow as string,
+        mode: r.mode as string,
+        status: r.status as string,
+        startedAt: r.started_at as number,
+        endedAt: (r.ended_at as number | null) ?? null,
+        dryRun: r.dry_run === 1,
+        sourceSessionId: (r.source_session_id as string | null) ?? null,
+        targetKind: r.target ? ((JSON.parse(r.target as string) as { kind?: string }).kind ?? null) : null,
+        steps: { total: r.steps_total as number, ok: r.steps_ok as number, failed: r.steps_failed as number },
+      })),
+    };
   }
 
   // ---- maintenance ----
