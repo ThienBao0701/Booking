@@ -11,8 +11,15 @@ import type {
   FindingDetail,
   ForensicReport,
   LabStats,
+  ReplayControlAction,
+  ReplayControllerKind,
+  ReplayLibraryEntry,
+  ReplayPrepareResult,
+  ReplayRunListItem,
+  ReplayRunStatus,
   ReplayRunSummary,
   RulesInfo,
+  SafetyMode,
   ScreenshotRecord,
   ScreenshotSettings,
   ScreenshotUsage,
@@ -129,5 +136,25 @@ export class Api {
     const file = await this.download(`/v1/screenshots/${encodeURIComponent(id)}/image`);
     return URL.createObjectURL(new Blob([file.bytes], { type: "image/png" }));
   };
+  // ---- dashboard replay (Phase 13) ----
+  replayWorkflows = () => this.get<{ workflows: ReplayLibraryEntry[]; serviceMode: SafetyMode }>("/v1/replay/workflows");
+  replayWorkflow = (id: string) => this.get<{ workflow: unknown; exampleParams: Record<string, string> | null }>(`/v1/replay/workflows/${encodeURIComponent(id)}`);
+  /** Dry run: validates and authorizes; nothing executes. */
+  replayPrepare = (body: {
+    workflowId?: string;
+    sessionId?: string;
+    mode: SafetyMode;
+    controller: ReplayControllerKind;
+    allowOrigins?: string[];
+    resourceOrigins?: string[];
+    params?: Record<string, string>;
+  }) => this.#call<ReplayPrepareResult>("POST", "/v1/replay/prepare", body);
+  replayRuns = () => this.get<{ runs: ReplayRunListItem[]; serviceMode: SafetyMode }>("/v1/replay/runs");
+  replayStatus = (id: string, since = 0) => this.get<ReplayRunStatus>(`/v1/replay/runs/${encodeURIComponent(id)}`, { since });
+  /** Explicit operator action: the plan's single-use token plus the acknowledgement. */
+  replayStart = (id: string, confirmToken: string) => this.#call<ReplayRunStatus>("POST", `/v1/replay/runs/${encodeURIComponent(id)}/start`, { confirmToken, acknowledge: true });
+  replayControl = (id: string, action: ReplayControlAction, arg: { label?: string; checkpointId?: string } = {}) =>
+    this.#call<ReplayRunStatus>("POST", `/v1/replay/runs/${encodeURIComponent(id)}/${action}`, arg);
+  replayDiscard = (id: string) => this.#call<{ discarded: boolean }>("DELETE", `/v1/replay/runs/${encodeURIComponent(id)}`);
   runAnalysis = (sessionIds?: string[]) => this.#call<AnalysisRunSummary>("POST", "/v1/analysis/run", sessionIds ? { sessionIds } : {});
 }

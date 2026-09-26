@@ -44,7 +44,8 @@ account.
 | 10 | Forensic reports: JSON · CSV (findings / events / evidence) · HTML · print-ready HTML, 11 sections, every finding linked to its exact event ids; API, CLI, dashboard | ✅ |
 | 11 | Browser adapter: Chromium via Playwright/CDP behind the controller interface; target policy + explicit origin allowlist + per-session egress proxy | ✅ |
 | 12 | Screenshot storage: optional local PNGs (off by default), bound to their capture event, retention / size / budget limits, delete; dashboard shows the images | ✅ |
-| 13–15 | Dashboard replay · native messaging · Windows production hardening | ⬜ next |
+| 13 | Dashboard replay: dry-run plan → review (target, authorization, workflow, step count, risk notice) → explicit acknowledged start; live progress, controls, logs; service mode is the ceiling | ✅ |
+| 14–15 | Native messaging · Windows production hardening | ⬜ next |
 
 **Tests:** 316 unit · 14 E2E on the mock at 127.0.0.1:4599 (incl. the full
 OBSERVE → RECORD → REPLAY → ANALYZE → COMPARE → REPORT pipeline) · 15
@@ -119,6 +120,7 @@ docs/              source-of-truth documentation + ADRs
 | Forensic reports | [16-reports](docs/16-reports.md) |
 | Browser adapter (real-browser replay) | [17-browser-adapter](docs/17-browser-adapter.md) |
 | Screenshot storage | [18-screenshot-storage](docs/18-screenshot-storage.md) |
+| Dashboard replay | [19-dashboard-replay](docs/19-dashboard-replay.md) |
 | ADRs | [docs/adr](docs/adr/) |
 
 ## Safety modes

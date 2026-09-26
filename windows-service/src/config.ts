@@ -19,6 +19,8 @@ export interface ServiceConfig {
   logLevel: "debug" | "info" | "warn" | "error";
   /** Built dashboard directory served at /dashboard/ (default: dashboard/dist). */
   dashboardDir?: string;
+  /** Operator workflow library for dashboard replays (default: <dataDir>/workflows). */
+  workflowsDir?: string;
 }
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
@@ -47,6 +49,7 @@ export interface ConfigEnv {
   LAB_ALLOWED_ORIGINS?: string;
   LAB_LOG_LEVEL?: string;
   LAB_DASHBOARD_DIR?: string;
+  LAB_WORKFLOWS_DIR?: string;
 }
 
 /**
@@ -84,5 +87,6 @@ export function loadConfig(env: ConfigEnv, authToken: string): ServiceConfig {
     rateLimit: { windowMs: 1000, max: 100 },
     logLevel: level as ServiceConfig["logLevel"],
     ...(env.LAB_DASHBOARD_DIR ? { dashboardDir: env.LAB_DASHBOARD_DIR } : {}),
+    ...(env.LAB_WORKFLOWS_DIR ? { workflowsDir: env.LAB_WORKFLOWS_DIR } : {}),
   };
 }

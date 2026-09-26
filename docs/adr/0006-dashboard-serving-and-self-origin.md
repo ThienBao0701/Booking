@@ -76,4 +76,8 @@ to other local web servers — including the mock Extranet on port 4599.
 - Phase 12: `img-src` also allows `blob:` — stored screenshots are fetched with
   the token and displayed from blob URLs. Scripts, connections and frames are
   unchanged (regression-tested).
+- Phase 13: decision 7's "triggering replays stays planned" is superseded by
+  [ADR-0008](0008-dashboard-initiated-replays.md) — the Replay page plans
+  runs as dry runs and starts them only with a single-use confirmation and an
+  explicit acknowledgement, capped by the service safety mode.
 

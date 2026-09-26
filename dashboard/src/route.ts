@@ -14,6 +14,7 @@ export const PAGES = [
   "findings",
   "environment",
   "runs",
+  "replay",
   "screenshots",
   "reports",
   "settings",

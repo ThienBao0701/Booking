@@ -117,6 +117,14 @@ screenshots via the engine hook (a failing sink never fails the step); the
 API's auth/origin/headers; the dashboard CSP allows `blob:` for images only;
 in Chromium the Screenshots page shows the real image and deletes it.
 
+## What the dashboard-replay suites prove (Phase 13)
+
+See [19-dashboard-replay](19-dashboard-replay.md#tests): planning never touches
+the target; start needs the single-use token and the acknowledgement; the
+service mode caps runs (an `OBSERVE` service never executes); one active run;
+parameter values never reach logs or stored runs; the example completes on the
+real mock through the API and through the page in Chromium.
+
 ## The mock at 127.0.0.1:4599
 
 E2E tests target `MOCK_EXTRANET_URL` (default `http://127.0.0.1:4599`, must be

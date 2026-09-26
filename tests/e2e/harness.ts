@@ -18,7 +18,7 @@ import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 
-import { isLoopbackUrl } from "../../shared/src/index.ts";
+import { type SafetyMode, isLoopbackUrl } from "../../shared/src/index.ts";
 import { createMockServer } from "../../mock-extranet/src/api.ts";
 import { createApiServer } from "../../windows-service/src/server.ts";
 import { Store } from "../../windows-service/src/db/store.ts";
@@ -83,7 +83,7 @@ export interface LabServiceHandle {
 
 export const E2E_TOKEN = "e2e-token-abcdefghijklmnopqrstuv";
 
-export async function startLabService(opts: { port?: number; dbPath?: string } = {}): Promise<LabServiceHandle> {
+export async function startLabService(opts: { port?: number; dbPath?: string; safetyMode?: SafetyMode } = {}): Promise<LabServiceHandle> {
   const dir = mkdtempSync(join(tmpdir(), "lab-e2e-"));
   const dbPath = opts.dbPath ?? join(dir, "lab.sqlite");
   const store = new Store(dbPath);
@@ -92,7 +92,7 @@ export async function startLabService(opts: { port?: number; dbPath?: string } =
     port: opts.port ?? 0,
     dataDir: dir,
     authToken: E2E_TOKEN,
-    safetyMode: "OBSERVE",
+    safetyMode: opts.safetyMode ?? "OBSERVE",
     allowedOrigins: [],
     rateLimit: { windowMs: 1000, max: 1000 },
     logLevel: "error",

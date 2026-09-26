@@ -21,6 +21,14 @@ configuration flag, env var, or API call can enable a forbidden capability.
   granted-by, acknowledgement timestamp). The tool records this record with each
   run for traceability.
 
+### Service mode as a ceiling (dashboard replays)
+
+Replays started from the dashboard ([19-dashboard-replay](19-dashboard-replay.md))
+may not use a mode above the service's `LAB_SAFETY_MODE`. With the default
+`OBSERVE`, the dashboard can plan and review a workflow but not execute it; run
+the service with `SIMULATE` to replay against the local mock, and with
+`AUTHORIZED_AUTOMATION` only when an authorized target is intended.
+
 ## Forbidden capabilities (hard denylist)
 
 The following are **not implemented** and cannot be enabled. The registry in
@@ -44,6 +52,7 @@ is rejected at the policy boundary. Adding such a capability would fail CI.
 |---|---|
 | `shared/src/safety` | modes, forbidden-capability denylist, target guard (`evaluateReplay`) — unit-tested |
 | Replay engine | authorization before any controller call; mock-only mode; params never persisted |
+| Replay manager (dashboard) | dry-run plan; single-use confirmation + acknowledgement; service mode ceiling; one active run |
 | Controller | bound to one origin; `MockExtranetController` refuses non-loopback targets |
 | Extension | least-privilege manifest policy (tests + build + lint); loopback-only bridge |
 | Lint (`scripts/lint.mjs`) | forbidden capability names and evasion APIs (navigator/screen overrides, `chrome.proxy`, `chrome.debugger`) rejected in source |

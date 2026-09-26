@@ -30,6 +30,12 @@ import { routeAnalysis } from "./routes/analysis.ts";
 import { routeQuery } from "./routes/query.ts";
 import { routeReports } from "./routes/reports.ts";
 import { routeScreenshots } from "./routes/screenshots.ts";
+import { routeReplay } from "./routes/replay.ts";
+import { WorkflowLibrary } from "./automation/library.ts";
+import { type ControllerFactory, ReplayManager } from "./automation/manager.ts";
+import { MockExtranetController } from "./automation/mock-controller.ts";
+import { BrowserAdapterController, PlaywrightAdapter } from "./automation/browser/index.ts";
+import { join } from "node:path";
 import { ScreenshotService } from "./screenshots/service.ts";
 import { serveDashboard } from "./routes/dashboard.ts";
 import { intParam, searchParam } from "./routes/params.ts";
@@ -48,15 +54,34 @@ export interface Ctx {
   analysis?: AnalysisService;
   /** Screenshot storage (Phase 12). Created on demand (disabled by default). */
   screenshots?: ScreenshotService;
+  /** Dashboard replays (Phase 13). Created on demand. */
+  replay?: ReplayManager;
+  library?: WorkflowLibrary;
 }
+
+/** Controllers for dashboard replays: the mock page model, or Chromium behind its browser policy. */
+export const defaultControllerFactory: ControllerFactory = ({ kind, policy }) => {
+  if (kind === "mock") return new MockExtranetController();
+  if (!policy) throw new Error("browser controller requires an allowlist policy");
+  return new BrowserAdapterController({ adapter: new PlaywrightAdapter(), policy, executablePath: process.env.LAB_BROWSER_EXECUTABLE || undefined });
+};
 
 export function createApiServer(ctx: Ctx): Server {
   const { config, store, bus, logger, limiter } = ctx;
   const analysis = ctx.analysis ?? new AnalysisService({ store, dataDir: config.dataDir });
   const screenshots = ctx.screenshots ?? new ScreenshotService({ store, dataDir: config.dataDir });
-  const routeCtx = { ...ctx, analysis, screenshots };
+  const replay =
+    ctx.replay ??
+    new ReplayManager({
+      serviceMode: () => config.safetyMode,
+      controllerFactory: defaultControllerFactory,
+      persist: (r) => store.saveRun(r),
+      onScreenshot: (s) => void screenshots.storeReplay({ runId: s.runId, stepId: s.stepId, workflow: s.workflow, data: s.data }),
+    });
+  const library = ctx.library ?? new WorkflowLibrary({ libraryDir: config.workflowsDir ?? join(config.dataDir, "workflows") });
+  const routeCtx = { ...ctx, analysis, screenshots, replay, library };
 
-  return createServer((req, res) => {
+  const server = createServer((req, res) => {
     const started = Date.now();
     const method = req.method ?? "GET";
     const url = new URL(req.url ?? "/", `http://${config.host}:${config.port}`);
@@ -133,10 +158,13 @@ export function createApiServer(ctx: Ctx): Server {
       done(500);
     });
   });
+  // A manager created here belongs to this server: stop its runs (and any browser) with it.
+  if (!ctx.replay) server.on("close", () => void replay.shutdown());
+  return server;
 }
 
 async function route(
-  ctx: Ctx & { analysis: AnalysisService; screenshots: ScreenshotService },
+  ctx: Ctx & { analysis: AnalysisService; screenshots: ScreenshotService; replay: ReplayManager; library: WorkflowLibrary },
   method: string,
   path: string,
   url: URL,
@@ -346,6 +374,10 @@ async function route(
   // Dashboard read queries (Phase 9).
   const queried = await routeQuery(ctx, method, path, url, req, res);
   if (queried !== undefined) return queried;
+
+  // Dashboard replays (Phase 13).
+  const replayed = await routeReplay({ ...ctx, serviceMode: () => ctx.config.safetyMode }, method, path, url, req, res);
+  if (replayed !== undefined) return replayed;
 
   // Screenshot storage (Phase 12).
   const shot = await routeScreenshots(ctx, method, path, url, req, res);

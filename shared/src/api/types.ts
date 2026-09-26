@@ -6,6 +6,9 @@
  */
 
 import type { Finding, RuleSet } from "../analysis/types.ts";
+import type { RunRecord, StepAction } from "../replay/types.ts";
+import type { AuthorizationRecord } from "../safety/policy.ts";
+import type { SafetyMode } from "../safety/modes.ts";
 
 export interface StoredEventRow {
   id: string;
@@ -122,3 +125,85 @@ export interface ScreenshotUsage {
   files: number;
   oldest: number | null;
 }
+
+// ---- Dashboard replay control (Phase 13) ----
+
+export type ReplayControllerKind = "mock" | "browser";
+export type ReplayEngineState = "idle" | "running" | "paused" | "completed" | "failed" | "stopped";
+export type ReplayControlAction = "pause" | "resume" | "stop" | "step" | "retry" | "checkpoint" | "rollback";
+
+/** A workflow the dashboard can plan: bundled example or the operator's library directory. */
+export interface ReplayLibraryEntry {
+  /** "examples:<stem>" or "library:<stem>". */
+  id: string;
+  source: "examples" | "library";
+  name: string;
+  valid: boolean;
+  errors: string[];
+  steps: number;
+  target: { kind: string; baseUrl?: string } | null;
+  hasExampleParams: boolean;
+}
+
+/** What the operator sees before a run can start (dry run; nothing executed). */
+export interface ReplayPlanView {
+  runId: string;
+  source: string;
+  workflow: string;
+  version: number;
+  mode: SafetyMode;
+  /** The service's safety mode — the ceiling for dashboard-started runs. */
+  serviceMode: SafetyMode;
+  controller: ReplayControllerKind;
+  target: { kind: string; baseUrl: string | null };
+  authorization: {
+    allowed: boolean;
+    code: string;
+    reason: string;
+    record: AuthorizationRecord | null;
+    /** Browser controller only: the explicit origin allowlist decision. */
+    browser: { allowed: boolean; code: string; reason: string; origins: string[]; resourceOrigins: string[] } | null;
+  };
+  stepCount: number;
+  steps: Array<{ id: string; action: StepAction; target?: string; timeoutMs: number; retries: number; checkpoint: boolean; params: string[] }>;
+  requiredParams: string[];
+  missingParams: string[];
+  wouldExecute: boolean;
+  blockers: string[];
+  riskNotice: string[];
+}
+
+export interface ReplayPrepareResult {
+  plan: ReplayPlanView;
+  /** Single-use; null when the plan cannot be executed. */
+  confirmToken: string | null;
+  expiresAt: number;
+}
+
+export interface ReplayLogEntry {
+  seq: number;
+  at: number;
+  type: string;
+  stepId?: string;
+  /** Redacted. Parameter values never appear here. */
+  message: string;
+}
+
+export interface ReplayRunStatus {
+  runId: string;
+  phase: "prepared" | "running" | "paused" | "failed" | "completed" | "stopped";
+  state: ReplayEngineState;
+  cursor: number;
+  progress: { done: number; total: number };
+  plan: ReplayPlanView;
+  record: RunRecord;
+  checkpoints: string[];
+  busy: boolean;
+  /** Entries with seq greater than the request's `since`. */
+  logs: ReplayLogEntry[];
+  lastError: string | null;
+  createdAt: number;
+  startedAt: number | null;
+}
+
+export type ReplayRunListItem = Pick<ReplayRunStatus, "runId" | "phase" | "state" | "progress" | "createdAt" | "startedAt"> & { workflow: string; controller: ReplayControllerKind };

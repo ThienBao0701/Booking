@@ -124,6 +124,13 @@ All service endpoints:
   redirect hops, CONNECT tunnels and WebSockets, and a landing check after each
   navigation. Service workers are blocked, downloads refused, dialogs
   dismissed. State capture never reads password or sensitive fields.
+- **Dashboard-initiated replays** (Phase 13, ADR-0008): planning is a dry run;
+  `start` requires the plan's single-use confirmation token (random, 10 min,
+  constant-time comparison) plus `acknowledge: true`; the service safety mode
+  is the ceiling for the run's mode (an `OBSERVE` service never executes);
+  one active run; parameter values are validated, kept in memory only, never
+  logged. Regression tests: `replay-manager.test.ts`,
+  `dashboard-replay.e2e.test.ts`, `replay.browser.test.ts`.
 
 ## Data at rest
 

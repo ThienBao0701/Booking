@@ -83,10 +83,12 @@ See [15 — Dashboard](15-dashboard.md).
 | `LAB_SERVICE_PORT` | `4577` | |
 | `LAB_DATA_DIR` | `./.lab-runtime` | SQLite, logs, token, watchdog lock |
 | `LAB_AUTH_TOKEN` | generated | set only to pin a token (≥ 16 chars) |
-| `LAB_SAFETY_MODE` | `OBSERVE` | reported to the extension via health/handshake |
+| `LAB_SAFETY_MODE` | `OBSERVE` | reported to the extension via health/handshake; the ceiling for dashboard replays ([19](19-dashboard-replay.md)) |
 | `LAB_ALLOWED_ORIGINS` | *(any extension)* | comma list, e.g. `chrome-extension://<id>` to pin |
 | `LAB_LOG_LEVEL` | `info` | `debug` · `info` · `warn` · `error` |
 | `LAB_DASHBOARD_DIR` | `dashboard/dist` | built dashboard served at `/dashboard/` |
+| `LAB_WORKFLOWS_DIR` | `<LAB_DATA_DIR>/workflows` | workflow library for dashboard replays |
+| `LAB_BROWSER_EXECUTABLE` | Playwright's Chromium | browser for real-browser dashboard replays |
 | `MOCK_EXTRANET_HOST` / `_PORT` | `127.0.0.1` / `4599` | mock |
 | `MOCK_EXTRANET_URL` | `http://127.0.0.1:4599` | E2E target (must be loopback) |
 

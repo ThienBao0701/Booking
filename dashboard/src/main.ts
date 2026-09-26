@@ -22,6 +22,7 @@ import { renderEvents } from "./pages/events.ts";
 import { renderFindings } from "./pages/findings.ts";
 import { renderEnvironment } from "./pages/environment.ts";
 import { renderRuns } from "./pages/runs.ts";
+import { renderReplay } from "./pages/replay.ts";
 import { renderScreenshots } from "./pages/screenshots.ts";
 import { renderReports } from "./pages/reports.ts";
 import { renderSettings } from "./pages/settings.ts";
@@ -36,6 +37,7 @@ const NAV: Array<[Page, string]> = [
   ["findings", "Findings"],
   ["environment", "Environment"],
   ["runs", "Runs"],
+  ["replay", "Replay"],
   ["screenshots", "Screenshots"],
   ["reports", "Reports"],
   ["settings", "Settings"],
@@ -51,6 +53,7 @@ const PAGES: Record<Page, PageRender> = {
   findings: renderFindings,
   environment: renderEnvironment,
   runs: renderRuns,
+  replay: renderReplay,
   screenshots: renderScreenshots,
   reports: renderReports,
   settings: renderSettings,

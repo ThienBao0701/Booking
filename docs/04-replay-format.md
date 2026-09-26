@@ -161,3 +161,10 @@ pnpm run replay:example        # the full-flow example against the mock
 
 Exit codes: `0` completed (or dry run that would execute), `1` failed,
 `2` denied / invalid / would not execute.
+
+## Dashboard
+
+The dashboard's Replay page drives the same engine through the service
+(`/v1/replay/*`): a dry-run plan first, then a start that needs the plan's
+single-use confirmation token and an explicit acknowledgement; the service
+safety mode caps the run's mode. See [19-dashboard-replay](19-dashboard-replay.md).

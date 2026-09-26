@@ -14,10 +14,12 @@ import { Store } from "./db/store.ts";
 import { EventBus } from "./eventbus.ts";
 import { Logger } from "./logger.ts";
 import { RateLimiter } from "./security.ts";
-import { createApiServer } from "./server.ts";
+import { createApiServer, defaultControllerFactory } from "./server.ts";
 import { isMainModule } from "./main-module.ts";
 import { AnalysisService } from "./analysis/service.ts";
 import { ScreenshotService } from "./screenshots/service.ts";
+import { ReplayManager } from "./automation/manager.ts";
+import { WorkflowLibrary } from "./automation/library.ts";
 
 function ensureToken(dataDir: string, fromEnv: string | undefined): string {
   if (fromEnv && fromEnv.length >= 16) return fromEnv;
@@ -104,7 +106,15 @@ export function startService(env: ConfigEnv = process.env as ConfigEnv): Promise
   const retentionTimer = setInterval(retention, 3_600_000);
   retentionTimer.unref?.();
 
-  const server = createApiServer({ config, store, bus, logger, limiter, analysis, screenshots });
+  const replay = new ReplayManager({
+    serviceMode: () => config.safetyMode,
+    controllerFactory: defaultControllerFactory,
+    persist: (r) => store.saveRun(r),
+    onScreenshot: (s) => void screenshots.storeReplay({ runId: s.runId, stepId: s.stepId, workflow: s.workflow, data: s.data }),
+  });
+  const library = new WorkflowLibrary({ libraryDir: config.workflowsDir ?? join(config.dataDir, "workflows") });
+
+  const server = createApiServer({ config, store, bus, logger, limiter, analysis, screenshots, replay, library });
   // Bound slow/stalled clients so a hung bridge connection cannot pin the service.
   server.headersTimeout = 10_000;
   server.requestTimeout = 15_000;
@@ -121,6 +131,7 @@ export function startService(env: ConfigEnv = process.env as ConfigEnv): Promise
           clearInterval(sweep);
           clearInterval(retentionTimer);
           stopAutoAnalysis();
+          void replay.shutdown();
           server.close(() => {
             store.close();
             logger.info("service_stopped", {});
