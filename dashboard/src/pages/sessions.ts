@@ -7,7 +7,7 @@ import { fmtDuration, fmtInt, fmtPct, fmtTime, shortId } from "../format.ts";
 import { buildHash, resolveRange } from "../route.ts";
 import { filterBar } from "../components/filters.ts";
 import { pager, table } from "../components/table.ts";
-import { button, card, chip, disclaimer, empty, errorBox, kv, link, pageHeader, severityBadge, workflowChip } from "../components/ui.ts";
+import { button, card, chip, disclaimer, empty, errorBox, kv, link, pageHeader, severityBadge, workflowChip, statusBadge } from "../components/ui.ts";
 
 const PAGE = 50;
 
@@ -87,7 +87,8 @@ export function findingsTable(ctx: Ctx, findings: readonly Finding[], persisted:
 }
 
 async function renderDetail(ctx: Ctx, main: HTMLElement, id: string): Promise<void> {
-  const [info, analysis, stored] = await Promise.all([ctx.api.session(id), ctx.api.analysis(id), ctx.api.findings({ session: id, limit: 500 })]);
+  const [info, analysis, stored, provenance] = await Promise.all([ctx.api.session(id), ctx.api.analysis(id), ctx.api.findings({ session: id, limit: 500 }), ctx.api.analysisStatus([id])]);
+  const prov = provenance.sessions[0];
   if (!ctx.alive()) return;
   const a: AnalysisResult = analysis;
   const s = info.session;
@@ -127,6 +128,12 @@ async function renderDetail(ctx: Ctx, main: HTMLElement, id: string): Promise<vo
         ["Events", fmtInt(a.event_count)],
         ["Events / minute", String(t.events_per_minute)],
         ["Analysed with", `${a.cohort_session_ids.length} session(s) · rules ${a.rules_version}`],
+        [
+          "Stored findings",
+          prov?.analyzed_at
+            ? h("span", { id: "session-provenance" }, statusBadge(prov.state), ` analysed ${fmtTime(prov.analyzed_at)} · rules ${prov.rules_version ?? "?"}${prov.reasons.length ? ` · ${prov.reasons.join(", ").replace(/_/g, " ")} — use “Re-run analysis”` : ""}`)
+            : h("span", { id: "session-provenance" }, statusBadge(prov?.state ?? "not_analyzed"), prov?.state === "stale" ? " no analysis record — use “Re-run analysis”" : " not analysed yet"),
+        ],
       ])),
       card("Data quality", kv([
         ["Quarantined events", fmtInt(dq.quarantined)],

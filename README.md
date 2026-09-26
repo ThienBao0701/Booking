@@ -48,10 +48,13 @@ account.
 | 14 | Native messaging: extension → native host (validated relay, handshake + version negotiation, origin check, route/header allowlist) → service; HTTP loopback fallback; per-user install/uninstall | ✅ |
 | 15 | Windows deployment: `lab install/upgrade/uninstall/status`, Task Scheduler registration (logon, least privilege), private runtime, versioned releases with health-checked rollback, config file with last-good recovery, supervisor health monitoring + no orphans, log rotation | ✅ |
 
-**Tests:** 316 unit · 14 E2E on the mock at 127.0.0.1:4599 (incl. the full
-OBSERVE → RECORD → REPLAY → ANALYZE → COMPARE → REPORT pipeline) · 15
-real-browser (built extension, dashboard, browser adapter and screenshots in Chromium). Lint, typecheck (6 configs) and the verified
-extension build run in CI. See [docs/10-testing.md](docs/10-testing.md).
+**Tests:** 381 unit · 19 E2E on the mock at 127.0.0.1:4599 (incl. the full
+OBSERVE → RECORD → REPLAY → ANALYZE → COMPARE → REPORT pipeline, dashboard
+replay, native messaging through the real host process, and the Windows
+deployment lifecycle with real processes) · 18 real-browser (built extension,
+dashboard, browser adapter, screenshots, replay page, native messaging and
+diagnostics in Chromium). Lint, typecheck and the verified extension build
+run in CI. See [docs/10-testing.md](docs/10-testing.md).
 
 ## Quick start
 

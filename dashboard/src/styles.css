@@ -305,3 +305,6 @@ ol.replay-log .log-run .log-type { color: var(--accent-ink); }
 @media (max-width: 640px) {
   .replay-form, .param-row { grid-template-columns: 1fr; }
 }
+
+/* diagnostics: stale findings */
+.stale-note { border-left-color: var(--warning); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }

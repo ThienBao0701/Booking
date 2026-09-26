@@ -6,7 +6,8 @@ import { fmtDuration, fmtInt, fmtPct, label, shortId } from "../format.ts";
 import { buildHash } from "../route.ts";
 import { pairedBars } from "../components/charts.ts";
 import { table } from "../components/table.ts";
-import { card, empty, kv, link, pageHeader, workflowChip } from "../components/ui.ts";
+import { button, card, empty, errorBox, kv, link, pageHeader, workflowChip } from "../components/ui.ts";
+import { saveBlob } from "../components/download.ts";
 
 function picker(ids: string[], value: string | undefined, name: string, onPick: (v: string) => void): HTMLElement {
   const sel = h("select", { name, "aria-label": `Session ${name.toUpperCase()}` }, h("option", { value: "" }, `Session ${name.toUpperCase()}…`), ...ids.map((id) => h("option", { value: id, selected: id === value }, shortId(id, 14)))) as HTMLSelectElement;
@@ -27,9 +28,21 @@ export const renderCompare: PageRender = async (ctx, main) => {
   if (!ctx.alive()) return;
   const A = `A · ${shortId(c.a, 8)}`;
   const B = `B · ${shortId(c.b, 8)}`;
+  const exportOut = h("span", { class: "muted", role: "status" });
+  const exporter = (format: "json" | "csv") =>
+    h(
+      "span",
+      { "data-export": format },
+      button(`Export ${format.toUpperCase()}`, () => {
+        void ctx.api
+          .compareFile(c.a, c.b, format)
+          .then((f) => saveBlob(f.bytes, f.contentType, f.filename))
+          .catch((err) => mount(exportOut, errorBox(err)));
+      }, "btn-ghost"),
+    );
   mount(
     main,
-    pageHeader("Compare sessions", h("span", null, link(buildHash("sessions", {}, c.a), c.a), " vs ", link(buildHash("sessions", {}, c.b), c.b))),
+    pageHeader("Compare sessions", h("span", null, link(buildHash("sessions", {}, c.a), c.a), " vs ", link(buildHash("sessions", {}, c.b), c.b)), exporter("json"), exporter("csv"), exportOut),
     bar,
     h(
       "div",

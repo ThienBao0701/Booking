@@ -102,6 +102,16 @@ CREATE TABLE IF NOT EXISTS runs (
   target            TEXT
 );
 
+-- Diagnostics: provenance of each session's stored findings (rule version,
+-- analysis time, event count analysed) for stale-finding detection.
+CREATE TABLE IF NOT EXISTS analysis_meta (
+  session_id    TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+  analyzed_at   INTEGER NOT NULL,
+  rules_version TEXT NOT NULL,
+  event_count   INTEGER NOT NULL,
+  finding_count INTEGER NOT NULL
+);
+
 -- Phase 12: stored screenshot images (files live in <dataDir>/screenshots/<sha256>.png).
 CREATE TABLE IF NOT EXISTS screenshots (
   id         TEXT PRIMARY KEY,

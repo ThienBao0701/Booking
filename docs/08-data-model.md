@@ -82,6 +82,15 @@ indexes in `ADDED_INDEXES`: `rule_id`, `severity`, `first_ts`); the schema
 version stays 1. Re-analysing a session replaces its findings in one
 transaction.
 
+### `analysis_meta` (diagnostics)
+| `session_id` (PK, cascades) | `analyzed_at` | `rules_version` | `event_count` | `finding_count` |
+
+Written in the same transaction as the session's findings; compared with the
+current rule-set version and event count to detect stale findings
+([14-analysis](14-analysis.md#provenance-and-stale-findings-diagnostics)).
+Created with `CREATE TABLE IF NOT EXISTS`, so existing databases gain it on
+start (schema version unchanged).
+
 ### `screenshots` (Phase 12)
 | `id` | `session_id` | `event_id` | `run_id` | `step_id` | `source` | `sha256` | `bytes` | `width` | `height` | `mime` | `ts` | `workflow` | `created_at` |
 

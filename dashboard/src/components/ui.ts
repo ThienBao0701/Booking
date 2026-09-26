@@ -18,6 +18,9 @@ const STATUS_CLASS: Record<string, string> = {
   running: "info",
   paused: "warning",
   pending: "neutral",
+  current: "good",
+  stale: "warning",
+  not_analyzed: "neutral",
 };
 
 /** Severity with icon + label (status colours never carry meaning alone). */

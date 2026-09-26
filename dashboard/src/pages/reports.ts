@@ -11,6 +11,7 @@ import { fmtDuration, fmtInt, fmtPct, fmtTime, shortId } from "../format.ts";
 import { buildHash } from "../route.ts";
 import { table } from "../components/table.ts";
 import { card, disclaimer, empty, errorBox, kv, link, pageHeader, severityBadge } from "../components/ui.ts";
+import { saveBlob } from "../components/download.ts";
 
 type Q = Record<string, string | undefined>;
 
@@ -22,16 +23,6 @@ const FILES: Array<{ label: string; q: Q; preview?: boolean }> = [
   { label: "CSV — events", q: { format: "csv", table: "events" } },
   { label: "CSV — evidence", q: { format: "csv", table: "evidence" } },
 ];
-
-function saveBlob(bytes: ArrayBuffer, type: string, filename: string): void {
-  const url = URL.createObjectURL(new Blob([bytes], { type }));
-  const a = h("a", { class: "sr-only", download: filename }) as HTMLAnchorElement;
-  a.href = url; // blob: URL created here (not recorded data)
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
-}
 
 function openBlob(text: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: "text/html" }));

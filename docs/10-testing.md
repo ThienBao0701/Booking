@@ -146,6 +146,17 @@ config never widens anything; logs rotate within limits; after a simulated
 reboot the extension reconnects and delivers what it queued. Task Scheduler
 itself is simulated (Linux CI).
 
+## What the diagnostics suites prove
+
+`windows-service/test/diagnostics.test.ts` and
+`tests/browser/diagnostics.browser.test.ts`: every analysis run records its
+rule version and time; findings become stale when the rules change, when
+events arrive later or when no record exists, and a stale-only re-run brings
+exactly those sessions back to current; the finding drill-down carries the
+provenance; comparison exports have the right headers, a BOM and guarded
+formula cells; in Chromium the stale banner, re-analysis, evidence → timeline
+link and the CSV download all work.
+
 ## The mock at 127.0.0.1:4599
 
 E2E tests target `MOCK_EXTRANET_URL` (default `http://127.0.0.1:4599`, must be

@@ -156,11 +156,13 @@ check → bearer token → rate limit), see [05-security-model](05-security-mode
 | method | route | effect |
 |---|---|---|
 | GET | `/v1/sessions/:id/analysis` | full `AnalysisResult` for one session against the recent cohort (not persisted) |
-| POST | `/v1/analysis/run` `{ sessionIds? }` | analyse (default: recent cohort, ≤ 200 ids) and **persist** findings, replacing earlier findings of those sessions |
+| POST | `/v1/analysis/run` `{ sessionIds? }` \| `{ stale: true }` | analyse (default: recent cohort, ≤ 200 ids; `stale`: only sessions with stale findings) and **persist** findings with their provenance, replacing earlier findings of those sessions; returns `analyzed_at` and `session_ids` |
+| GET | `/v1/analysis/status?sessions=a,b` | `AnalysisStatusReport`: current rule version and source, per session `state` (`current` / `stale` / `not_analyzed`), `reasons`, `analyzed_at`, `rules_version`, event counts, finding count (default: the latest 500 sessions) |
 | GET | `/v1/analysis/compare?a=&b=` | `SessionComparison` |
+| GET | `/v1/analysis/compare?a=&b=&format=json\|csv[&download=1]` | comparison export: JSON (`kind: "lab-session-comparison"`, `format_version`, `lab_version`, `exported_at`, `comparison`) or CSV (`section,item,a,b,delta_b_minus_a,detail`; UTF-8 BOM; formula cells prefixed with `'`); `download=1` sends it as an attachment |
 | GET | `/v1/analysis/graph?sessions=a,b` | `WorkflowGraph` (default: recent cohort) |
 | GET | `/v1/findings?session=&workflow=&severity=&category=&rule=&q=&from=&to=&limit=&offset=` | persisted findings, `{ total, findings }` (limit ≤ 500) |
-| GET | `/v1/findings/:id` | `{ finding, events, missing_event_ids }` — the stored events the finding cites |
+| GET | `/v1/findings/:id` | `{ finding, events, missing_event_ids, analysis }` — the stored events the finding cites and its session's analysis provenance |
 | GET | `/v1/analysis/rules` | `{ source, version, error, rules }` |
 | PUT | `/v1/analysis/rules` | validate + persist a custom rule set (atomic write, mode 0600); `400 invalid_rules` with errors otherwise |
 | DELETE | `/v1/analysis/rules` | back to the built-in rules |
@@ -173,8 +175,24 @@ the service analyses it off the request path — coalesced, 1.5 s after the end
 so the bridge's final batch has landed — and persists its findings. Failures
 are logged (`analysis_failed`) and never affect ingestion.
 
+## Provenance and stale findings (diagnostics)
+
+Every analysis run records, per session, **when** it ran, the **rule-set
+version** it used and how many events it analysed (`analysis_meta`). A
+session's stored findings are **stale** when
+
+- `rules_changed` — the rule set was edited or reset since;
+- `new_events` — events arrived after the analysis (e.g. a late batch);
+- `no_analysis_record` — the findings predate provenance tracking.
+
+Stale findings stay visible (they are still what that analysis found) but are
+flagged in the dashboard with the reason; *Re-analyze stale sessions* on the
+Findings page (`POST /v1/analysis/run {stale: true}`) refreshes exactly those
+sessions, and a finding's drill-down offers *Re-analyze this session*.
+
 ## Storage
 
-Findings extend the existing `findings` table additively (no new table, no
-schema-version bump); see [08-data-model](08-data-model.md). Older rows remain
-readable (`rule_id: "LEGACY"`).
+Findings extend the existing `findings` table additively; provenance lives
+in the additive `analysis_meta` table (no schema-version bump); see
+[08-data-model](08-data-model.md). Older rows remain readable
+(`rule_id: "LEGACY"`) and are reported as stale (`no_analysis_record`).

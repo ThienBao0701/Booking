@@ -10,6 +10,9 @@ import { fileURLToPath } from "node:url";
 import {
   type AnalysisResult,
   type AnalysisRunSummary,
+  type AnalysisStatus,
+  type AnalysisStatusReport,
+  type StaleReason,
   type EnvironmentReport,
   type RulesInfo,
   type RuleSet,
@@ -131,15 +134,63 @@ export class AnalysisService {
   run(sessionIds?: readonly string[]): RunSummary {
     const subjects = sessionIds && sessionIds.length > 0 ? sessionIds.filter((id) => this.#store.hasSession(id)) : this.#recentIds();
     const context = [...new Set([...subjects, ...this.#recentIds()])];
+    const version = rulesVersion(this.#rules);
+    const analyzedAt = this.#now();
+    // Event counts are taken before analysing, so events that arrive meanwhile mark the result stale.
+    const meta = subjects.map((id) => ({ session_id: id, analyzed_at: analyzedAt, rules_version: version, event_count: this.#store.countEvents(id) }));
     const results = analyzeCohort(this.#load(context), { rules: this.#rules, now: this.#now });
     const findings = subjects.flatMap((id) => results.get(id)?.findings ?? []);
-    this.#store.saveFindings(subjects, findings);
+    this.#store.saveFindings(subjects, findings, meta);
     return {
       sessions: subjects.length,
       findings: findings.length,
-      rules_version: rulesVersion(this.#rules),
+      rules_version: version,
       warnings: subjects.flatMap((id) => (results.get(id)?.warnings ?? []).map((w) => `${id}: ${w}`)),
+      analyzed_at: analyzedAt,
+      session_ids: [...subjects],
     };
+  }
+
+  /**
+   * Are the stored findings still current? A session is stale when the rule
+   * set changed since its analysis, when events arrived after it, or when it
+   * has findings without an analysis record (from before provenance existed).
+   */
+  status(sessionIds?: readonly string[]): AnalysisStatusReport {
+    const current = rulesVersion(this.#rules);
+    const ids = sessionIds && sessionIds.length > 0 ? sessionIds.filter((id) => this.#store.hasSession(id)) : this.#store.listSessions(500).map((s) => s.id);
+    const meta = new Map(this.#store.getAnalysisMeta(ids).map((m) => [m.session_id, m]));
+    const counts = this.#store.findingCounts(ids);
+    const sessions: AnalysisStatus[] = ids.map((id) => {
+      const m = meta.get(id);
+      const eventCount = this.#store.countEvents(id);
+      const findingCount = counts.get(id) ?? 0;
+      const reasons: StaleReason[] = [];
+      if (!m) {
+        if (findingCount > 0) reasons.push("no_analysis_record");
+      } else {
+        if (m.rules_version !== current) reasons.push("rules_changed");
+        if (eventCount !== m.event_count) reasons.push("new_events");
+      }
+      return {
+        session_id: id,
+        state: reasons.length > 0 ? "stale" : m ? "current" : "not_analyzed",
+        reasons,
+        analyzed_at: m?.analyzed_at ?? null,
+        rules_version: m?.rules_version ?? null,
+        event_count_at_analysis: m?.event_count ?? null,
+        event_count: eventCount,
+        finding_count: findingCount,
+      };
+    });
+    return { current_rules_version: current, rules_source: this.#source, stale: sessions.filter((s) => s.state === "stale").length, sessions };
+  }
+
+  /** Re-analyse only the sessions whose stored findings are stale. */
+  runStale(): RunSummary {
+    const stale = this.status().sessions.filter((s) => s.state === "stale").map((s) => s.session_id);
+    if (stale.length === 0) return { sessions: 0, findings: 0, rules_version: rulesVersion(this.#rules), warnings: [], analyzed_at: this.#now(), session_ids: [] };
+    return this.run(stale);
   }
 
   compare(a: string, b: string): SessionComparison | undefined {

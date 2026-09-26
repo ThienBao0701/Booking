@@ -70,6 +70,38 @@ export interface AnalysisRunSummary {
   findings: number;
   rules_version: string;
   warnings: string[];
+  /** When the findings were produced (diagnostics). */
+  analyzed_at?: number;
+  /** The sessions that were (re-)analysed. */
+  session_ids?: string[];
+}
+
+/**
+ * Whether a session's stored findings still reflect its data and the current
+ * rules (diagnostics). "stale": re-run the analysis to refresh them.
+ */
+export type AnalysisState = "current" | "stale" | "not_analyzed";
+export type StaleReason = "rules_changed" | "new_events" | "no_analysis_record";
+
+export interface AnalysisStatus {
+  session_id: string;
+  state: AnalysisState;
+  reasons: StaleReason[];
+  /** When the stored findings were produced (null: never / unknown). */
+  analyzed_at: number | null;
+  /** Rule-set version that produced them. */
+  rules_version: string | null;
+  event_count_at_analysis: number | null;
+  event_count: number;
+  finding_count: number;
+}
+
+export interface AnalysisStatusReport {
+  current_rules_version: string;
+  rules_source: "default" | "custom";
+  /** Sessions whose findings are stale. */
+  stale: number;
+  sessions: AnalysisStatus[];
 }
 
 /** GET /v1/analysis/rules */
@@ -85,6 +117,8 @@ export interface FindingDetail {
   finding: Finding;
   events: StoredEventRow[];
   missing_event_ids: string[];
+  /** Analysis provenance of the finding's session: rule version, time, staleness. */
+  analysis?: AnalysisStatus;
 }
 
 /** Stored screenshot image (Phase 12). The image bytes are served separately. */

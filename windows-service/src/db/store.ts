@@ -81,6 +81,16 @@ export interface NewSession {
   metadata?: Record<string, unknown>;
 }
 
+export interface AnalysisMetaInput {
+  session_id: string;
+  analyzed_at: number;
+  rules_version: string;
+  event_count: number;
+}
+export interface AnalysisMetaRow extends AnalysisMetaInput {
+  finding_count: number;
+}
+
 export class Store {
   #db: DatabaseSync;
 
@@ -340,8 +350,14 @@ export class Store {
    * Replace the findings of `sessionIds` with `findings` (one transaction):
    * re-running analysis never leaves stale or duplicate findings.
    */
-  saveFindings(sessionIds: readonly string[], findings: readonly Finding[]): void {
+  saveFindings(sessionIds: readonly string[], findings: readonly Finding[], meta: ReadonlyArray<AnalysisMetaInput> = []): void {
     this.transaction(() => {
+      const up = this.#db.prepare(
+        `INSERT INTO analysis_meta(session_id, analyzed_at, rules_version, event_count, finding_count) VALUES(?,?,?,?,?)
+         ON CONFLICT(session_id) DO UPDATE SET analyzed_at=excluded.analyzed_at, rules_version=excluded.rules_version,
+           event_count=excluded.event_count, finding_count=excluded.finding_count`,
+      );
+      for (const m of meta) up.run(m.session_id, m.analyzed_at, m.rules_version, m.event_count, findings.filter((f) => f.session_id === m.session_id).length);
       const del = this.#db.prepare("DELETE FROM findings WHERE session_id=?");
       for (const id of sessionIds) del.run(id);
       const ins = this.#db.prepare(
@@ -374,6 +390,25 @@ export class Store {
         );
       }
     });
+  }
+
+  /** Provenance of stored findings (diagnostics); all sessions when `ids` is omitted. */
+  getAnalysisMeta(ids?: readonly string[]): AnalysisMetaRow[] {
+    const rows = (ids
+      ? ids.length === 0
+        ? []
+        : this.#db.prepare(`SELECT * FROM analysis_meta WHERE session_id IN (${ids.map(() => "?").join(",")})`).all(...ids)
+      : this.#db.prepare("SELECT * FROM analysis_meta").all()) as Array<Record<string, unknown>>;
+    return rows.map((r) => ({ session_id: r.session_id as string, analyzed_at: r.analyzed_at as number, rules_version: r.rules_version as string, event_count: r.event_count as number, finding_count: r.finding_count as number }));
+  }
+
+  /** Stored finding counts per session. */
+  findingCounts(ids: readonly string[]): Map<string, number> {
+    const out = new Map<string, number>();
+    if (ids.length === 0) return out;
+    const rows = this.#db.prepare(`SELECT session_id, COUNT(*) AS n FROM findings WHERE session_id IN (${ids.map(() => "?").join(",")}) GROUP BY session_id`).all(...ids) as Array<{ session_id: string; n: number }>;
+    for (const r of rows) out.set(r.session_id, r.n);
+    return out;
   }
 
   #rowToFinding(r: Record<string, unknown>): Finding {

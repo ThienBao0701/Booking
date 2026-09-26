@@ -6,6 +6,7 @@
 import type {
   AnalysisResult,
   AnalysisRunSummary,
+  AnalysisStatusReport,
   EnvironmentReport,
   Finding,
   FindingDetail,
@@ -156,5 +157,9 @@ export class Api {
   replayControl = (id: string, action: ReplayControlAction, arg: { label?: string; checkpointId?: string } = {}) =>
     this.#call<ReplayRunStatus>("POST", `/v1/replay/runs/${encodeURIComponent(id)}/${action}`, arg);
   replayDiscard = (id: string) => this.#call<{ discarded: boolean }>("DELETE", `/v1/replay/runs/${encodeURIComponent(id)}`);
+  analysisStatus = (sessions?: string[]) => this.get<AnalysisStatusReport>("/v1/analysis/status", { sessions: sessions?.join(",") });
+  /** Re-analyse only the sessions whose stored findings are stale. */
+  runStaleAnalysis = () => this.#call<AnalysisRunSummary>("POST", "/v1/analysis/run", { stale: true });
+  compareFile = (a: string, b: string, format: "json" | "csv") => this.download("/v1/analysis/compare", { a, b, format, download: 1 });
   runAnalysis = (sessionIds?: string[]) => this.#call<AnalysisRunSummary>("POST", "/v1/analysis/run", sessionIds ? { sessionIds } : {});
 }
