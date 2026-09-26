@@ -68,3 +68,12 @@ to other local web servers — including the mock Extranet on port 4599.
 - The dashboard works whenever the service runs; `pnpm run build` produces it.
 - Security review surface: the static route (tests cover traversal, headers,
   and that other local origins are still rejected).
+
+## Amendments
+
+- Phase 10: `style-src` also allows exactly the report stylesheet hash, so
+  report previews (blob documents inheriting this policy) render styled.
+- Phase 12: `img-src` also allows `blob:` — stored screenshots are fetched with
+  the token and displayed from blob URLs. Scripts, connections and frames are
+  unchanged (regression-tested).
+

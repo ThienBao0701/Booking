@@ -273,3 +273,11 @@ svg.graph text { paint-order: stroke; stroke: var(--surface-1); stroke-width: 4p
 ul.files { gap: 8px; }
 .file-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .file-label { flex: 1; min-width: 180px; }
+
+/* screenshots */
+.shot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.shot { margin: 0; background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.shot-frame { display: block; background: var(--surface-2); aspect-ratio: 16 / 10; }
+.shot-img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.shot figcaption { padding: 8px 10px; display: grid; gap: 2px; font-size: 12.5px; }
+.shot-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }

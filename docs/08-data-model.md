@@ -82,8 +82,13 @@ indexes in `ADDED_INDEXES`: `rule_id`, `severity`, `first_ts`); the schema
 version stays 1. Re-analysing a session replaces its findings in one
 transaction.
 
-### `screenshots`
-| `id` | `session_id` | `event_id` | `path` | `sha256` | `trigger_action` | `ts` |
+### `screenshots` (Phase 12)
+| `id` | `session_id` | `event_id` | `run_id` | `step_id` | `source` | `sha256` | `bytes` | `width` | `height` | `mime` | `ts` | `workflow` | `created_at` |
+
+The file path is derived (`<dataDir>/screenshots/<sha256>.png`); `source`
+(`extension` \| `replay`) replaces the planned `trigger_action`. Rows cascade
+with their session; unreferenced files are garbage-collected. Details:
+[18-screenshot-storage](18-screenshot-storage.md).
 
 ### `environment_reports` (derived — not a table)
 Per-session environment snapshot (Component 8) for cross-session comparison.

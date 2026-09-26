@@ -14,9 +14,9 @@
 
 `pnpm run test` = unit + E2E. `pnpm run verify` = lint + typecheck + test + build.
 
-Counts at this revision: **304 unit** (62 shared · 157 service · 11 mock ·
-62 extension · 12 dashboard), **14 E2E**, **14 real-browser** (2 extension ·
-9 dashboard · 3 browser adapter). Earlier tests are unchanged and still pass.
+Counts at this revision: **316 unit** (62 shared · 167 service · 11 mock ·
+64 extension · 12 dashboard), **14 E2E**, **15 real-browser** (2 extension ·
+9 dashboard · 3 browser adapter · 1 screenshots). Earlier tests are unchanged and still pass.
 
 ## What the E2E suites prove
 
@@ -106,6 +106,16 @@ See [17-browser-adapter](17-browser-adapter.md#tests): authorization and the
 explicit allowlist gate every browser launch; nothing reaches a
 non-allowlisted origin in a real Chromium (images, fetches, links, direct
 navigation, redirect hops); the example workflow replays on the real mock UI.
+
+## What the screenshot suites prove (Phase 12)
+
+Storage is off by default and nothing is written while off; settings fail
+closed; images bind only to their own recorded `SCREENSHOT` event (session,
+byte size, uploader hash = bytes); PNG/size/budget limits; shared files are
+released only when unreferenced; retention and orphan collection; replay
+screenshots via the engine hook (a failing sink never fails the step); the
+API's auth/origin/headers; the dashboard CSP allows `blob:` for images only;
+in Chromium the Screenshots page shows the real image and deletes it.
 
 ## The mock at 127.0.0.1:4599
 

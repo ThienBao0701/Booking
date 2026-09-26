@@ -35,9 +35,12 @@ and provably applied.
 
 - Captured only on an explicit user action trigger (Component 1), not
   continuously.
-- Stored locally; a masking pass can be applied. Operators should avoid
-  screenshotting pages showing secrets; the tool warns on known-sensitive
-  routes (config-driven).
+- By default only a capture record (time, page, size) is kept. Keeping the
+  **image** is off until the operator turns it on in Settings, and is bounded
+  by retention days, a per-image size limit and a storage budget; images can
+  be deleted one by one or per session ([18-screenshot-storage](18-screenshot-storage.md)).
+- Images stay on this machine (mode 0600) and need the token to view.
+  Operators should avoid screenshotting pages showing secrets.
 
 ## Data lifecycle
 

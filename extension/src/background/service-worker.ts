@@ -227,17 +227,30 @@ async function onUi(msg: UiMessage): Promise<unknown> {
         return { ok: false, error: "active tab is not a recordable origin" };
       }
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
-      const bytes = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(",") + 1)), (ch) => ch.charCodeAt(0));
+      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      const bytes = Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0));
       const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
       const sha256 = [...digest].map((b) => b.toString(16).padStart(2, "0")).join("");
-      c.recorder.record({
+      const ev = c.recorder.record({
         action: "screenshot",
         page: pagePath(tab.url),
         tabId: tab.id,
         metadata: { sha256, bytes: bytes.length, format: "png", trigger: "user" },
       });
       recorded(c);
-      return { ok: true, sha256, bytes: bytes.length };
+      // Phase 12: the image itself is uploaded only if the service has storage
+      // enabled (off by default); the event (hash + size) is always recorded.
+      let image: { stored: boolean; reason?: string } = { stored: false, reason: "not uploaded" };
+      const info = await c.bridge.handshake().catch(() => undefined);
+      if (ev && info?.screenshots.enabled && bytes.length <= info.screenshots.maxImageBytes) {
+        await c.recorder.flush({ manual: true }); // the event must exist before its image
+        image = await c.bridge.uploadScreenshot({ sessionId: ev.session_id, eventId: ev.event_id, sha256, dataBase64: base64 });
+      } else if (info && !info.screenshots.enabled) {
+        image = { stored: false, reason: "storage disabled in the service (hash only)" };
+      } else if (info) {
+        image = { stored: false, reason: "image larger than the service limit (hash only)" };
+      }
+      return { ok: true, sha256, bytes: bytes.length, image };
     }
     case "lab/ui/testConnection": {
       const health = await c.bridge.health();

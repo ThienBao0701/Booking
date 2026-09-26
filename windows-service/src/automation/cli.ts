@@ -17,6 +17,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 import { isSafetyMode, ReplayNotAuthorizedError, type SafetyMode } from "../shared.ts";
 import { Store } from "../db/store.ts";
@@ -24,6 +25,7 @@ import { MockExtranetController } from "./mock-controller.ts";
 import { ReplayEngine, ReplayValidationError } from "./engine.ts";
 import type { BrowserController } from "./controller.ts";
 import { BrowserAdapterController, BrowserTargetPolicy, PlaywrightAdapter } from "./browser/index.ts";
+import { ScreenshotService } from "../screenshots/service.ts";
 import { isMainModule } from "../main-module.ts";
 
 interface Args {
@@ -121,9 +123,12 @@ export async function main(argv: string[]): Promise<number> {
       }
       controller = new BrowserAdapterController({ adapter: new PlaywrightAdapter(), policy: p.policy, headless: !args.headed, executablePath: args.browserPath });
     }
+    // Replay screenshots are kept only when storage is enabled in that data dir (Phase 12).
+    const shots = store && args.db ? new ScreenshotService({ store, dataDir: dirname(args.db) }) : undefined;
     const engine = new ReplayEngine(workflow, {
       mode: args.mode,
       controller,
+      ...(shots ? { onScreenshot: (s: { runId: string; stepId: string; data: Uint8Array }) => void shots.storeReplay({ runId: s.runId, stepId: s.stepId, workflow: (workflow as { workflow?: string }).workflow ?? null, data: s.data }) } : {}),
       mockOnly: args.mockOnly,
       params: args.params,
       ...(store ? { persist: (r) => store.saveRun(r) } : {}),

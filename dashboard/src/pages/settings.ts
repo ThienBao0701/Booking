@@ -14,8 +14,30 @@ import { type Theme, getTheme, setTheme } from "../theme.ts";
 import { signOut } from "../session.ts";
 
 export const renderSettings: PageRender = async (ctx, main) => {
-  const [health, handshake, rules] = await Promise.all([ctx.api.health(), ctx.api.handshake(), ctx.api.rules()]);
+  const [health, handshake, rules, shots] = await Promise.all([ctx.api.health(), ctx.api.handshake(), ctx.api.rules(), ctx.api.screenshotSettings()]);
   if (!ctx.alive()) return;
+
+  // Screenshot storage (Phase 12): off by default; explicit switch + limits.
+  const MB = 1024 * 1024;
+  const sEnabled = h("input", { type: "checkbox", id: "shot-enabled", checked: shots.settings.enabled }) as HTMLInputElement;
+  const sDays = h("input", { type: "number", id: "shot-days", min: 1, max: 365, value: shots.settings.retentionDays }) as HTMLInputElement;
+  const sImage = h("input", { type: "number", id: "shot-image", min: 1, max: 20, step: 1, value: Math.round(shots.settings.maxImageBytes / MB) }) as HTMLInputElement;
+  const sTotal = h("input", { type: "number", id: "shot-total", min: 1, max: 10240, step: 1, value: Math.round(shots.settings.maxTotalBytes / MB) }) as HTMLInputElement;
+  const sFeedback = h("div", { class: "feedback", role: "status", "aria-live": "polite" });
+  const saveShots = () => {
+    const next = { enabled: sEnabled.checked, retentionDays: Number(sDays.value), maxImageBytes: Number(sImage.value) * MB, maxTotalBytes: Number(sTotal.value) * MB };
+    if (next.enabled && !shots.settings.enabled && !window.confirm("Store screenshot images on this machine? Screenshots can show personal or confidential data; they are kept locally and deleted after the retention period.")) return;
+    void ctx.api
+      .putScreenshotSettings(next)
+      .then((r) => mount(sFeedback, h("p", { class: "ok-box" }, `Saved: storage ${r.settings.enabled ? "enabled" : "disabled"}.`)))
+      .catch((err) => mount(sFeedback, errorBox(err)));
+  };
+  const retentionNow = () => {
+    void ctx.api
+      .applyScreenshotRetention()
+      .then((r) => mount(sFeedback, h("p", { class: "ok-box" }, `Retention applied: ${r.deleted} image(s), ${r.orphans} orphaned file(s) removed.`)))
+      .catch((err) => mount(sFeedback, errorBox(err)));
+  };
 
   const editor = h("textarea", { class: "rules-editor", rows: 18, spellcheck: "false", "aria-label": "Rule set JSON" }) as HTMLTextAreaElement;
   editor.value = JSON.stringify(rules.rules, null, 2);
@@ -78,6 +100,20 @@ export const renderSettings: PageRender = async (ctx, main) => {
         ["Theme", themeSel],
         ["Token", h("span", null, "held in this tab only ", button("Sign out", signOut, "btn-ghost"))],
       ])),
+    ),
+    card(
+      "Screenshot storage",
+      h("p", { class: "muted small" }, "Off by default. When on, the extension uploads the PNG of each screenshot the operator captures, and replay screenshot steps are kept. Images stay on this machine, need the token to view, and are deleted after the retention period."),
+      kv([
+        ["Store images", h("label", null, sEnabled, " enabled")],
+        ["Retention (days)", sDays],
+        ["Max image size (MiB)", sImage],
+        ["Storage budget (MiB)", sTotal],
+        ["In use", `${shots.usage.count} image(s), ${(shots.usage.bytes / MB).toFixed(1)} MiB`],
+        ["Load problem", shots.error ?? "none"],
+      ]),
+      h("div", { class: "actions" }, button("Save screenshot settings", saveShots, "btn-primary"), button("Apply retention now", retentionNow, "btn-ghost")),
+      sFeedback,
     ),
     card(
       "Analysis rules",

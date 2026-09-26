@@ -102,6 +102,28 @@ CREATE TABLE IF NOT EXISTS runs (
   target            TEXT
 );
 
+-- Phase 12: stored screenshot images (files live in <dataDir>/screenshots/<sha256>.png).
+CREATE TABLE IF NOT EXISTS screenshots (
+  id         TEXT PRIMARY KEY,
+  session_id TEXT REFERENCES sessions(id) ON DELETE CASCADE,
+  event_id   TEXT,
+  run_id     TEXT,
+  step_id    TEXT,
+  source     TEXT NOT NULL,
+  sha256     TEXT NOT NULL,
+  bytes      INTEGER NOT NULL,
+  width      INTEGER NOT NULL,
+  height     INTEGER NOT NULL,
+  mime       TEXT NOT NULL,
+  ts         INTEGER NOT NULL,
+  workflow   TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_screenshots_session ON screenshots(session_id);
+CREATE INDEX IF NOT EXISTS idx_screenshots_ts ON screenshots(ts);
+CREATE INDEX IF NOT EXISTS idx_screenshots_sha ON screenshots(sha256);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_screenshots_event ON screenshots(event_id) WHERE event_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS run_steps (
   run_id     TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
   step_id    TEXT NOT NULL,

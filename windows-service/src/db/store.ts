@@ -12,6 +12,7 @@ import {
   type LabEvent,
   type LabStats,
   type ReplayRunSummary,
+  type ScreenshotRecord,
   type SessionSummary,
   type StoredEventRow,
   type SessionRecord,
@@ -624,6 +625,89 @@ export class Store {
         steps: { total: r.steps_total as number, ok: r.steps_ok as number, failed: r.steps_failed as number },
       })),
     };
+  }
+
+  // ---- screenshots (Phase 12) ----
+
+  insertScreenshot(r: ScreenshotRecord): void {
+    this.#db
+      .prepare(
+        `INSERT INTO screenshots(id, session_id, event_id, run_id, step_id, source, sha256, bytes, width, height, mime, ts, workflow, created_at)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      )
+      .run(r.id, r.session_id, r.event_id, r.run_id, r.step_id, r.source, r.sha256, r.bytes, r.width, r.height, r.mime, r.ts, r.workflow, r.created_at);
+  }
+
+  getScreenshot(id: string): ScreenshotRecord | undefined {
+    return this.#db.prepare("SELECT * FROM screenshots WHERE id=?").get(id) as ScreenshotRecord | undefined;
+  }
+
+  getScreenshotByEvent(eventId: string): ScreenshotRecord | undefined {
+    return this.#db.prepare("SELECT * FROM screenshots WHERE event_id=?").get(eventId) as ScreenshotRecord | undefined;
+  }
+
+  listScreenshots(filter: { sessionId?: string | undefined; runId?: string | undefined; from?: number | undefined; to?: number | undefined; limit?: number | undefined; offset?: number | undefined } = {}): {
+    total: number;
+    screenshots: ScreenshotRecord[];
+  } {
+    const where: string[] = [];
+    const args: Array<string | number> = [];
+    if (filter.sessionId) {
+      where.push("session_id = ?");
+      args.push(filter.sessionId);
+    }
+    if (filter.runId) {
+      where.push("run_id = ?");
+      args.push(filter.runId);
+    }
+    if (filter.from !== undefined) {
+      where.push("ts >= ?");
+      args.push(filter.from);
+    }
+    if (filter.to !== undefined) {
+      where.push("ts <= ?");
+      args.push(filter.to);
+    }
+    const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const total = (this.#db.prepare(`SELECT COUNT(*) AS n FROM screenshots ${clause}`).get(...args) as { n: number }).n;
+    const screenshots = this.#db
+      .prepare(`SELECT * FROM screenshots ${clause} ORDER BY ts DESC, id LIMIT ? OFFSET ?`)
+      .all(...args, clampLimit(filter.limit, 100), Math.max(0, filter.offset ?? 0)) as unknown as ScreenshotRecord[];
+    return { total, screenshots };
+  }
+
+  /** Delete rows; returns the removed records (so their files can be released). */
+  deleteScreenshots(where: { id?: string; sessionId?: string; olderThan?: number }): ScreenshotRecord[] {
+    let clause: string;
+    let arg: string | number;
+    if (where.id !== undefined) [clause, arg] = ["id = ?", where.id];
+    else if (where.sessionId !== undefined) [clause, arg] = ["session_id = ?", where.sessionId];
+    else if (where.olderThan !== undefined) [clause, arg] = ["ts < ?", where.olderThan];
+    else return [];
+    return this.transaction(() => {
+      const rows = this.#db.prepare(`SELECT * FROM screenshots WHERE ${clause}`).all(arg) as unknown as ScreenshotRecord[];
+      this.#db.prepare(`DELETE FROM screenshots WHERE ${clause}`).run(arg);
+      return rows;
+    });
+  }
+
+  isScreenshotShaReferenced(sha256: string): boolean {
+    return this.#db.prepare("SELECT 1 AS x FROM screenshots WHERE sha256=? LIMIT 1").get(sha256) !== undefined;
+  }
+
+  /** Distinct stored images (files) and their total size, plus row count. */
+  screenshotUsage(): { count: number; files: number; bytes: number; oldest: number | null } {
+    const rows = this.#db.prepare("SELECT COUNT(*) AS n, MIN(ts) AS oldest FROM screenshots").get() as { n: number; oldest: number | null };
+    const files = this.#db.prepare("SELECT COUNT(*) AS files, COALESCE(SUM(bytes),0) AS bytes FROM (SELECT sha256, MAX(bytes) AS bytes FROM screenshots GROUP BY sha256)").get() as {
+      files: number;
+      bytes: number;
+    };
+    return { count: rows.n, files: files.files, bytes: files.bytes, oldest: rows.oldest ?? null };
+  }
+
+  /** One stored event (for binding an uploaded image to its SCREENSHOT event). */
+  getStoredEvent(id: string): StoredEventRow | undefined {
+    return this.#db.prepare("SELECT * FROM events WHERE id=?").get(id) as StoredEventRow | undefined;
   }
 
   // ---- maintenance ----

@@ -78,6 +78,8 @@ export interface HandshakeInfo {
   contractVersion: number;
   safetyMode: string;
   maxBatchEvents: number;
+  /** Phase 12: whether the service stores screenshot images (off unless enabled there). */
+  screenshots: { enabled: boolean; maxImageBytes: number };
 }
 
 export interface BridgeOptions {
@@ -327,7 +329,28 @@ export class BridgeClient implements EventSink {
       contractVersion: b.contractVersion,
       safetyMode: String(b.safetyMode ?? ""),
       maxBatchEvents: this.#maxBatch,
+      screenshots: (() => {
+        const s = (b.screenshots ?? {}) as Record<string, unknown>;
+        return { enabled: s.enabled === true, maxImageBytes: typeof s.maxImageBytes === "number" ? s.maxImageBytes : 0 };
+      })(),
     };
+  }
+
+  /**
+   * Upload the PNG of a recorded screenshot event (Phase 12). Only when the
+   * service has storage enabled; the service binds the image to the event by
+   * its recorded sha256. Never throws: returns why an image was not stored.
+   */
+  async uploadScreenshot(u: { sessionId: string; eventId: string; sha256: string; dataBase64: string }): Promise<{ stored: boolean; reason?: string }> {
+    if (!this.#token) return { stored: false, reason: "unpaired" };
+    try {
+      const res = await this.#request("POST", "/v1/screenshots", u);
+      if (res.status === 201) return { stored: true };
+      const code = ((res.body ?? {}) as { error?: string }).error ?? `status ${res.status}`;
+      return { stored: false, reason: code };
+    } catch (e) {
+      return { stored: false, reason: asBridgeError(e).message };
+    }
   }
 
   /** (Re)connect: handshake + deliver any pending session ends. Never throws. */

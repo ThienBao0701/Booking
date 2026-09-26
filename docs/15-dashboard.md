@@ -32,9 +32,9 @@ Sign out* forgets it.
 | **Findings** | filterable list (range, session, workflow, severity, category, rule, text). **Drill-down**: description, confidence (explained), evidence table with the exact triggering event ids (each opens the drawer), counter-evidence, platform caveat, recommended next test, context | `/v1/findings`, `/v1/findings/:id` |
 | **Environment** | recorded environment facts per session; values differing from the most common value are marked `≠` | `/v1/analysis/environment` |
 | **Runs** | replay runs with step outcomes; detail with steps, checkpoints, target + authorization record | `/v1/runs`, `/v1/runs/:id` |
-| **Screenshots** | user-triggered capture records (SHA-256, size, format, trigger). Images are not retained by the recorder | `/v1/events?kind=SCREENSHOT` |
+| **Screenshots** | stored images (grid, delete one / a session's), capture records, storage usage; storage is off by default ([18-screenshot-storage](18-screenshot-storage.md)) | `/v1/screenshots`, `/v1/events?kind=SCREENSHOT` |
 | **Reports** | per-session forensic report: executive summary, key findings, section overview, integrity digest; download JSON / CSV ×3 / HTML / print-ready HTML; preview HTML ([16-reports](16-reports.md)) | `/v1/reports/sessions/:id` |
-| **Settings** | service health and versions; analysis rules (table, JSON editor validated in the browser with the shared validator and again, fail-closed, by the service; reset to built-in); theme; sign out | `/healthz`, `/v1/bridge/handshake`, `/v1/analysis/rules` |
+| **Settings** | screenshot storage switch, retention and limits; service health and versions; analysis rules (table, JSON editor validated in the browser with the shared validator and again, fail-closed, by the service; reset to built-in); theme; sign out | `/healthz`, `/v1/bridge/handshake`, `/v1/analysis/rules` |
 
 **Event drawer** (from any event row, tick, evidence row or sample): stored
 fields, redacted payload as text, links to the timeline and session, and the
@@ -59,8 +59,8 @@ follows the OS or the Settings choice.
 - Served only by the service (same origin); no CORS. The API accepts exactly
   the service's own origin in addition to extension / no-origin clients; any
   other origin, including other local ports, is rejected (`403`).
-- CSP `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'
-  data:; connect-src 'self'; base-uri 'none'; form-action 'none';
+- CSP `default-src 'none'; script-src 'self'; style-src 'self' '<report
+  stylesheet hash>'; img-src 'self' data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none';
   frame-ancestors 'none'`, plus `X-Frame-Options: DENY`, `no-referrer`,
   `nosniff`, COOP/CORP `same-origin`.
 - Recorded data is untrusted: all rendering uses text nodes and attribute

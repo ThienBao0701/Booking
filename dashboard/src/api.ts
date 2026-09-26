@@ -13,6 +13,9 @@ import type {
   LabStats,
   ReplayRunSummary,
   RulesInfo,
+  ScreenshotRecord,
+  ScreenshotSettings,
+  ScreenshotUsage,
   RunRecord,
   SessionComparison,
   SessionRecord,
@@ -115,5 +118,16 @@ export class Api {
   resetRules = () => this.#call<{ source: string; version: string }>("DELETE", "/v1/analysis/rules");
   report = (id: string, compare?: string) => this.get<ForensicReport>(`/v1/reports/sessions/${encodeURIComponent(id)}`, { format: "json", compare });
   reportFile = (id: string, q: Q) => this.download(`/v1/reports/sessions/${encodeURIComponent(id)}`, q);
+  screenshots = (q: Q) => this.get<{ total: number; screenshots: ScreenshotRecord[] }>("/v1/screenshots", q);
+  screenshotSettings = () => this.get<{ settings: ScreenshotSettings; usage: ScreenshotUsage; error: string | null }>("/v1/screenshots/settings");
+  putScreenshotSettings = (s: ScreenshotSettings) => this.#call<{ settings: ScreenshotSettings; usage: ScreenshotUsage }>("PUT", "/v1/screenshots/settings", s);
+  deleteScreenshot = (id: string) => this.#call<{ deleted: boolean }>("DELETE", `/v1/screenshots/${encodeURIComponent(id)}`);
+  deleteSessionScreenshots = (sessionId: string) => this.#call<{ deleted: number }>("DELETE", `/v1/sessions/${encodeURIComponent(sessionId)}/screenshots`);
+  applyScreenshotRetention = () => this.#call<{ deleted: number; orphans: number }>("POST", "/v1/screenshots/retention", {});
+  /** The PNG as a blob: URL (fetched with the token). Revoke when done. */
+  screenshotImage = async (id: string): Promise<string> => {
+    const file = await this.download(`/v1/screenshots/${encodeURIComponent(id)}/image`);
+    return URL.createObjectURL(new Blob([file.bytes], { type: "image/png" }));
+  };
   runAnalysis = (sessionIds?: string[]) => this.#call<AnalysisRunSummary>("POST", "/v1/analysis/run", sessionIds ? { sessionIds } : {});
 }

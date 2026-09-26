@@ -25,6 +25,12 @@ function showError(text: string | null | undefined): void {
   el.textContent = text ?? "";
 }
 
+function showNotice(text: string): void {
+  const el = $("notice");
+  el.hidden = false;
+  el.textContent = text;
+}
+
 async function refresh(): Promise<void> {
   const s = await call<Status>({ type: "lab/ui/status" });
   if (!s.ok) return showError(s.error ?? "status unavailable");
@@ -60,7 +66,14 @@ async function act(msg: UiMessage): Promise<void> {
 $("start").addEventListener("click", () => void act({ type: "lab/ui/start" }));
 $("stop").addEventListener("click", () => void act({ type: "lab/ui/stop" }));
 $("flush").addEventListener("click", () => void act({ type: "lab/ui/flush" }));
-$("capture").addEventListener("click", () => void act({ type: "lab/ui/capture" }));
+$("capture").addEventListener("click", () => {
+  void (async () => {
+    const r = await call<{ ok: boolean; error?: string; image?: { stored: boolean; reason?: string } }>({ type: "lab/ui/capture" });
+    if (!r.ok && r.error) showError(r.error);
+    else if (r.image) showNotice(r.image.stored ? "Screenshot recorded; image stored locally." : `Screenshot recorded (${r.image.reason ?? "hash only"}).`);
+    await refresh();
+  })();
+});
 $("options").addEventListener("click", (e) => {
   e.preventDefault();
   void chrome.runtime.openOptionsPage();

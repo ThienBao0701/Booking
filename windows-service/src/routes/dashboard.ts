@@ -19,7 +19,8 @@ export const DASHBOARD_CSP = [
   // The report stylesheet hash lets report previews (blob: documents, which
   // inherit this policy) render styled; it allows that exact stylesheet only.
   `style-src 'self' '${REPORT_STYLE_HASH}'`,
-  "img-src 'self' data:",
+  // blob: images only — stored screenshots are fetched with the token and shown as blob URLs.
+  "img-src 'self' data: blob:",
   "connect-src 'self'",
   "base-uri 'none'",
   "form-action 'none'",

@@ -57,6 +57,7 @@ export type ReplayEventType =
   | "step.retrying"
   | "step.failed"
   | "step.skipped"
+  | "step.warning"
   | "checkpoint";
 
 export interface ReplayEvent {
@@ -84,6 +85,11 @@ export interface ReplayOptions {
   onEvent?: (e: ReplayEvent) => void;
   /** Persist the run record after every change (e.g. Store.saveRun). */
   persist?: (run: RunRecord) => void | Promise<void>;
+  /**
+   * Receive screenshot images taken by `captureScreenshot` steps (Phase 12,
+   * e.g. ScreenshotService.storeReplay). A failing sink never fails the step.
+   */
+  onScreenshot?: (shot: { runId: string; stepId: string; data: Uint8Array; sha256?: string | undefined; mimeType?: string | undefined }) => void | Promise<void>;
 }
 
 export interface Checkpoint {
@@ -530,6 +536,13 @@ export class ReplayEngine {
         return "ok";
       case "captureScreenshot": {
         const shot = await c.captureScreenshot(opts);
+        if (shot.supported && shot.data && this.#o.onScreenshot) {
+          try {
+            await this.#o.onScreenshot({ runId: this.#record.runId, stepId: step.id, data: shot.data, sha256: shot.sha256, mimeType: shot.mimeType });
+          } catch (err) {
+            this.#emit("step.warning", step.id, { warning: "screenshot not stored", error: err instanceof Error ? err.message : String(err) });
+          }
+        }
         return shot.supported ? "ok" : "skipped";
       }
     }

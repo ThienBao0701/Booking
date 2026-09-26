@@ -29,6 +29,8 @@ import { AnalysisService } from "./analysis/service.ts";
 import { routeAnalysis } from "./routes/analysis.ts";
 import { routeQuery } from "./routes/query.ts";
 import { routeReports } from "./routes/reports.ts";
+import { routeScreenshots } from "./routes/screenshots.ts";
+import { ScreenshotService } from "./screenshots/service.ts";
 import { serveDashboard } from "./routes/dashboard.ts";
 import { intParam, searchParam } from "./routes/params.ts";
 
@@ -44,12 +46,15 @@ export interface Ctx {
   limiter: RateLimiter;
   /** Workflow analyzer (Phase 8). Created on demand when not supplied. */
   analysis?: AnalysisService;
+  /** Screenshot storage (Phase 12). Created on demand (disabled by default). */
+  screenshots?: ScreenshotService;
 }
 
 export function createApiServer(ctx: Ctx): Server {
   const { config, store, bus, logger, limiter } = ctx;
   const analysis = ctx.analysis ?? new AnalysisService({ store, dataDir: config.dataDir });
-  const routeCtx = { ...ctx, analysis };
+  const screenshots = ctx.screenshots ?? new ScreenshotService({ store, dataDir: config.dataDir });
+  const routeCtx = { ...ctx, analysis, screenshots };
 
   return createServer((req, res) => {
     const started = Date.now();
@@ -131,7 +136,7 @@ export function createApiServer(ctx: Ctx): Server {
 }
 
 async function route(
-  ctx: Ctx & { analysis: AnalysisService },
+  ctx: Ctx & { analysis: AnalysisService; screenshots: ScreenshotService },
   method: string,
   path: string,
   url: URL,
@@ -171,6 +176,8 @@ async function route(
       safetyMode: ctx.config.safetyMode,
       maxBatchEvents: MAX_BATCH_EVENTS,
       maxBodyBytes: MAX_BODY_BYTES,
+      // Phase 12: whether the extension should upload screenshot images.
+      screenshots: { enabled: ctx.screenshots.settings.enabled, maxImageBytes: ctx.screenshots.settings.maxImageBytes },
     });
     return 200;
   }
@@ -339,6 +346,10 @@ async function route(
   // Dashboard read queries (Phase 9).
   const queried = await routeQuery(ctx, method, path, url, req, res);
   if (queried !== undefined) return queried;
+
+  // Screenshot storage (Phase 12).
+  const shot = await routeScreenshots(ctx, method, path, url, req, res);
+  if (shot !== undefined) return shot;
 
   // Forensic reports (Phase 10).
   const reported = await routeReports(ctx, method, path, url, req, res);

@@ -83,3 +83,42 @@ export interface FindingDetail {
   events: StoredEventRow[];
   missing_event_ids: string[];
 }
+
+/** Stored screenshot image (Phase 12). The image bytes are served separately. */
+export interface ScreenshotRecord {
+  id: string;
+  session_id: string | null;
+  /** The SCREENSHOT event the image belongs to (extension captures). */
+  event_id: string | null;
+  /** Replay screenshots: the run and step that captured it. */
+  run_id: string | null;
+  step_id: string | null;
+  source: "extension" | "replay";
+  sha256: string;
+  bytes: number;
+  width: number;
+  height: number;
+  mime: "image/png";
+  /** Capture time (the event's timestamp for extension captures). */
+  ts: number;
+  workflow: string | null;
+  created_at: number;
+}
+
+/** Privacy controls for screenshot storage. Disabled unless explicitly enabled. */
+export interface ScreenshotSettings {
+  enabled: boolean;
+  /** Images older than this are deleted by the retention sweep. */
+  retentionDays: number;
+  /** Largest accepted PNG. */
+  maxImageBytes: number;
+  /** Total storage budget; uploads beyond it are refused. */
+  maxTotalBytes: number;
+}
+
+export interface ScreenshotUsage {
+  count: number;
+  bytes: number;
+  files: number;
+  oldest: number | null;
+}

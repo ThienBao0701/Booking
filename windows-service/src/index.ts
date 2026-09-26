@@ -17,6 +17,7 @@ import { RateLimiter } from "./security.ts";
 import { createApiServer } from "./server.ts";
 import { isMainModule } from "./main-module.ts";
 import { AnalysisService } from "./analysis/service.ts";
+import { ScreenshotService } from "./screenshots/service.ts";
 
 function ensureToken(dataDir: string, fromEnv: string | undefined): string {
   if (fromEnv && fromEnv.length >= 16) return fromEnv;
@@ -88,7 +89,22 @@ export function startService(env: ConfigEnv = process.env as ConfigEnv): Promise
   if (analysis.rulesInfo().error) logger.warn("analysis_rules", { error: analysis.rulesInfo().error });
   const stopAutoAnalysis = autoAnalyzeOnSessionEnd(bus, analysis, logger);
 
-  const server = createApiServer({ config, store, bus, logger, limiter, analysis });
+  const screenshots = new ScreenshotService({ store, dataDir: config.dataDir });
+  if (screenshots.settingsError) logger.warn("screenshot_settings", { error: screenshots.settingsError });
+  // Retention: at start and hourly (deletes expired images and orphaned files).
+  const retention = () => {
+    try {
+      const r = screenshots.applyRetention();
+      if (r.deleted || r.orphans) logger.info("screenshot_retention", r);
+    } catch (err) {
+      logger.error("screenshot_retention_failed", { error: String(err) });
+    }
+  };
+  retention();
+  const retentionTimer = setInterval(retention, 3_600_000);
+  retentionTimer.unref?.();
+
+  const server = createApiServer({ config, store, bus, logger, limiter, analysis, screenshots });
   // Bound slow/stalled clients so a hung bridge connection cannot pin the service.
   server.headersTimeout = 10_000;
   server.requestTimeout = 15_000;
@@ -103,6 +119,7 @@ export function startService(env: ConfigEnv = process.env as ConfigEnv): Promise
       const close = () =>
         new Promise<void>((done) => {
           clearInterval(sweep);
+          clearInterval(retentionTimer);
           stopAutoAnalysis();
           server.close(() => {
             store.close();
