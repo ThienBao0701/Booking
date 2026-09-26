@@ -11,6 +11,9 @@
  * It confines, it does not disguise: it binds 127.0.0.1 only, forwards directly
  * from this machine (same IP, same browser headers), has no upstream proxy and
  * no rotation. It is created per browser session and closed with it.
+ *
+ * Every socket and stream it owns has an error handler: a browser resetting a
+ * connection (e.g. right after a 403) must never crash the hosting process.
  */
 
 import { type IncomingMessage, type Server, type ServerResponse, createServer, request as httpRequest } from "node:http";
@@ -65,7 +68,10 @@ export class EgressProxy {
     this.#server.on("connection", (s: Socket) => {
       this.#sockets.add(s);
       s.on("close", () => this.#sockets.delete(s));
+      // CONNECT / upgrade sockets leave the HTTP server's error handling; keep one here for their whole life.
+      s.on("error", () => s.destroy());
     });
+    this.#server.on("clientError", (_err: Error, s: Socket) => s.destroy());
   }
 
   async start(): Promise<string> {
@@ -91,6 +97,8 @@ export class EgressProxy {
   }
 
   #onRequest(req: IncomingMessage, res: ServerResponse): void {
+    req.on("error", () => res.destroy());
+    res.on("error", () => req.destroy());
     let target: URL;
     try {
       target = new URL(req.url ?? "");
@@ -113,12 +121,18 @@ export class EgressProxy {
     const upstream = httpRequest(
       { host: target.hostname.replace(/^\[|\]$/g, ""), port: target.port || 80, method: req.method, path: `${target.pathname}${target.search}`, headers: { ...forwardHeaders(req.headers), host: target.host }, agent: false },
       (up) => {
+        up.on("error", () => res.destroy());
         res.writeHead(up.statusCode ?? 502, forwardHeaders(up.headers));
         up.pipe(res);
       },
     );
+    req.on("error", () => upstream.destroy());
+    res.on("close", () => {
+      if (!res.writableFinished) upstream.destroy();
+    });
     upstream.setTimeout(this.#o.socketTimeoutMs ?? 60_000, () => upstream.destroy(new Error("upstream timeout")));
     upstream.on("error", () => {
+      if (res.destroyed) return;
       if (!res.headersSent) res.writeHead(502, { "content-type": "text/plain" });
       res.end();
     });
@@ -126,6 +140,7 @@ export class EgressProxy {
   }
 
   #onConnect(req: IncomingMessage, socket: Socket, head: Buffer): void {
+    socket.on("error", () => socket.destroy());
     const origin = originFromConnect(req.url);
     const d = origin ? this.#o.allowOrigin(origin) : { allowed: false, reason: "malformed CONNECT target" };
     if (!origin || !d.allowed) {
@@ -154,6 +169,7 @@ export class EgressProxy {
   }
 
   #onUpgrade(req: IncomingMessage, socket: Socket, head: Buffer): void {
+    socket.on("error", () => socket.destroy());
     let target: URL | undefined;
     try {
       target = new URL(req.url ?? "");
@@ -179,6 +195,7 @@ export class EgressProxy {
     });
     upstream.on("error", () => socket.destroy());
     socket.on("error", () => upstream.destroy());
+    socket.on("close", () => upstream.destroy());
   }
 
   async close(): Promise<void> {

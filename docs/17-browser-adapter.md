@@ -45,6 +45,10 @@ never for navigation.
   checked against the allowlisted origins; denied connections get `403` and
   never reach the other host. This closes the gap that Playwright request
   routing does not see redirect hops (found by the Phase 11 real-browser test).
+  Every socket and stream the proxy owns handles its errors: a browser that
+  resets a connection (typically right after a `403`) cannot crash the
+  service hosting the proxy (found by the final quality gate; regression test
+  `egress-proxy-resets.test.ts`).
 - **Landing check** — after every navigation, history move or click, the page
   must be on an allowlisted origin; otherwise the tab is moved to
   `about:blank` and the step fails with `NAVIGATION_BLOCKED`. An action that
@@ -115,6 +119,9 @@ is denied (exit 2) before any browser starts.
   timeout, redacted state capture, screenshots, engine integration, CLI denial.
 - Unit (`egress-proxy.test.ts`, real sockets): forwarding, 403 for other
   origins, redirect hops re-checked, CONNECT tunnels, WebSocket upgrades.
+- Unit (`egress-proxy-resets.test.ts`): connection resets on refused CONNECTs
+  and upgrades, open tunnels, upgrades in progress and half-sent request
+  bodies are absorbed; the proxy keeps forwarding and refusing afterwards.
 - Real browser (`tests/browser/browser-adapter.browser.test.ts`): the example
   workflow replays on the real mock UI in Chromium with the same module
   sequence as the mock controller; nothing (image, fetch, link, direct
