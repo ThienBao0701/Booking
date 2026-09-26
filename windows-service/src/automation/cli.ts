@@ -18,6 +18,7 @@ import { isSafetyMode, ReplayNotAuthorizedError, type SafetyMode } from "../shar
 import { Store } from "../db/store.ts";
 import { MockExtranetController } from "./mock-controller.ts";
 import { ReplayEngine, ReplayValidationError } from "./engine.ts";
+import { isMainModule } from "../main-module.ts";
 
 interface Args {
   file: string;
@@ -109,7 +110,7 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+const isMain = isMainModule(import.meta.url);
 if (isMain) {
   void main(process.argv.slice(2)).then((code) => process.exit(code));
 }

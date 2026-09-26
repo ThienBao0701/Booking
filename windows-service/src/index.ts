@@ -15,6 +15,7 @@ import { EventBus } from "./eventbus.ts";
 import { Logger } from "./logger.ts";
 import { RateLimiter } from "./security.ts";
 import { createApiServer } from "./server.ts";
+import { isMainModule } from "./main-module.ts";
 
 function ensureToken(dataDir: string, fromEnv: string | undefined): string {
   if (fromEnv && fromEnv.length >= 16) return fromEnv;
@@ -84,7 +85,7 @@ export function startService(env: ConfigEnv = process.env as ConfigEnv): Promise
 }
 
 // Start when executed directly (not when imported by tests).
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+const isMain = isMainModule(import.meta.url);
 if (isMain) {
   startService().catch((err: unknown) => {
     process.stderr.write(`fatal: ${String(err)}\n`);

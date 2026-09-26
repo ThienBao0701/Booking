@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
+import { isMainModule } from "./main-module.ts";
 
 const MIN_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
@@ -127,7 +128,7 @@ export function startWatchdog(opts: WatchdogOptions): { stop: () => void } {
   return { stop };
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+const isMain = isMainModule(import.meta.url);
 if (isMain) {
   const here = dirname(fileURLToPath(import.meta.url));
   startWatchdog({
