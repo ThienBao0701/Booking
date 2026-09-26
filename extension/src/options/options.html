@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Lab Recorder — Options</title>
+  <link rel="stylesheet" href="../ui/styles.css" />
+</head>
+<body class="options">
+  <h1>Browser Automation Lab — Recorder</h1>
+  <p class="note">Records <strong>your own</strong> sessions, redacted at source, and sends them only to the local lab service on this machine. No evasion, no spoofing.</p>
+
+  <h2>Local service pairing</h2>
+  <label for="serviceUrl">Service URL (loopback only)</label>
+  <input id="serviceUrl" placeholder="http://127.0.0.1:4577" />
+  <label for="token">Pairing token (from <code>&lt;LAB_DATA_DIR&gt;/auth-token.txt</code>)</label>
+  <input id="token" type="password" autocomplete="off" spellcheck="false" />
+  <div class="actions">
+    <button id="save" class="primary">Save</button>
+    <button id="test">Test connection</button>
+  </div>
+  <pre id="out" class="out" hidden></pre>
+
+  <h2>Recordable origins</h2>
+  <p class="note">Loopback (the mock Extranet) is always recordable. Add the exact origin of another system you are authorized to observe; Chrome will ask you to grant access to that origin only.</p>
+  <div class="inline">
+    <input id="origin" placeholder="https://staging.example.com" />
+    <button id="addOrigin">Add origin</button>
+  </div>
+  <ul id="origins" class="origins"></ul>
+
+  <h2>Recording</h2>
+  <div class="row">
+    <div>
+      <label for="safetyMode">Session safety mode</label>
+      <select id="safetyMode">
+        <option value="OBSERVE">OBSERVE</option>
+        <option value="SIMULATE">SIMULATE</option>
+        <option value="AUTHORIZED_AUTOMATION">AUTHORIZED_AUTOMATION</option>
+      </select>
+    </div>
+    <div><label for="batchSize">Batch size (1–500)</label><input id="batchSize" type="number" min="1" max="500" /></div>
+    <div><label for="flushIntervalMs">Flush interval (ms)</label><input id="flushIntervalMs" type="number" min="250" max="60000" /></div>
+    <div><label for="domDebounceMs">DOM debounce (ms)</label><input id="domDebounceMs" type="number" min="100" max="10000" /></div>
+    <div><label for="maxQueue">Offline queue cap</label><input id="maxQueue" type="number" min="100" max="50000" /></div>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

@@ -13,17 +13,32 @@
     "shared",
     "windows-service",
     "mock-extranet",
+    "extension",
     "dashboard"
   ],
+  "devDependencies": {
+    "@types/chrome": "^0.3.0",
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.2"
+  },
   "scripts": {
-    "test": "npm run test --workspaces --if-present",
+    "lint": "node --experimental-strip-types scripts/lint.mjs",
+    "typecheck": "tsc --noEmit -p shared/tsconfig.json && tsc --noEmit -p windows-service/tsconfig.json && tsc --noEmit -p mock-extranet/tsconfig.json && tsc --noEmit -p extension/tsconfig.json && tsc --noEmit -p extension/tsconfig.test.json && tsc --noEmit -p tests/tsconfig.json",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test --experimental-strip-types --experimental-sqlite shared/test/*.test.ts windows-service/test/*.test.ts mock-extranet/test/*.test.ts extension/test/*.test.ts",
     "test:shared": "node --test --experimental-strip-types shared/test/*.test.ts",
     "test:service": "node --test --experimental-strip-types --experimental-sqlite windows-service/test/*.test.ts",
     "test:mock": "node --test --experimental-strip-types mock-extranet/test/*.test.ts",
-    "test:core": "node --test --experimental-strip-types --experimental-sqlite shared/test/*.test.ts windows-service/test/*.test.ts mock-extranet/test/*.test.ts",
-    "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "test:extension": "node --test --experimental-strip-types extension/test/*.test.ts",
+    "test:e2e": "node --test --test-concurrency=1 --experimental-strip-types --experimental-sqlite tests/e2e/*.test.ts",
+    "test:core": "npm run test:unit",
+    "build": "node --experimental-strip-types extension/build.mjs",
+    "build:extension": "node --experimental-strip-types extension/build.mjs",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "start:service": "node --experimental-strip-types --experimental-sqlite windows-service/src/index.ts",
+    "start:watchdog": "node --experimental-strip-types --experimental-sqlite windows-service/src/watchdog.ts",
+    "start:mock": "node --experimental-strip-types mock-extranet/src/index.ts"
   },
   "keywords": [
     "diagnostics",
@@ -33,5 +48,10 @@
     "forensics",
     "workflow-replay",
     "mv3-extension"
-  ]
+  ],
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
 }

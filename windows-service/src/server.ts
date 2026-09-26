@@ -13,12 +13,17 @@ import type { Logger } from "./logger.ts";
 import { parseBearer, verifyToken, tokenId } from "./auth.ts";
 import { isHostAllowed, isOriginAllowed, RateLimiter } from "./security.ts";
 import {
+  type LabEvent,
   newPrefixedId,
   validateEventBatch,
   DEFAULT_SAFETY_MODE,
+  CONTRACT_VERSION,
+  LAB_VERSION,
 } from "./shared.ts";
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2 MiB per request
+/** Max events accepted per POST /v1/events (request validation; bridge batches below this). */
+export const MAX_BATCH_EVENTS = 500;
 const START_TS = Date.now();
 
 interface Ctx {
@@ -39,6 +44,17 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(json);
 }
 
+/** A client error with an HTTP status (request validation), never a 500. */
+class HttpError extends Error {
+  readonly status: number;
+  readonly code: string;
+  constructor(status: number, code: string) {
+    super(code);
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function readBody(req: IncomingMessage): Promise<unknown> {
   return await new Promise((resolve, reject) => {
     let size = 0;
@@ -46,18 +62,19 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
     req.on("data", (c: Buffer) => {
       size += c.length;
       if (size > MAX_BODY_BYTES) {
-        reject(new Error("payload too large"));
-        req.destroy();
+        reject(new HttpError(413, "payload_too_large"));
+        req.resume(); // drain without buffering so the 413 can be sent
         return;
       }
       chunks.push(c);
     });
     req.on("end", () => {
+      if (size > MAX_BODY_BYTES) return;
       if (chunks.length === 0) return resolve(undefined);
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
       } catch {
-        reject(new Error("invalid JSON"));
+        reject(new HttpError(400, "invalid_json"));
       }
     });
     req.on("error", reject);
@@ -124,6 +141,10 @@ export function createApiServer(ctx: Ctx): Server {
 
     // 6) Routes.
     void route(ctx, method, path, url, req, res).then(done).catch((err: unknown) => {
+      if (err instanceof HttpError) {
+        if (!res.headersSent) send(res, err.status, { error: err.code });
+        return done(err.status);
+      }
       logger.error("route_error", { path, error: String(err) });
       if (!res.headersSent) send(res, 500, { error: "internal_error" });
       done(500);
@@ -147,24 +168,48 @@ async function route(
     const sessionId = typeof body.sessionId === "string" ? body.sessionId : newPrefixedId("session");
     const mode = typeof body.mode === "string" ? body.mode : DEFAULT_SAFETY_MODE;
     const target = (body.target as { kind?: string; host?: string }) ?? { kind: "observe" };
-    store.createSession({
+    // Idempotent: a bridge reconnect may re-register the same session id.
+    const created = store.createSession({
       id: sessionId,
-      startedAt: Date.now(),
+      startedAt: typeof body.startedAt === "number" ? body.startedAt : Date.now(),
       mode,
       targetKind: target.kind ?? "observe",
       ...(target.host ? { targetHost: target.host } : {}),
       metadata: (body.metadata as Record<string, unknown>) ?? {},
     });
-    bus.publish({ type: "session.start", payload: { sessionId } });
-    send(res, 201, { sessionId });
-    return 201;
+    if (created) bus.publish({ type: "session.start", payload: { sessionId } });
+    const status = created ? 201 : 200;
+    send(res, status, { sessionId, created });
+    return status;
+  }
+
+  // GET /v1/bridge/handshake — authenticated capability/contract check for the
+  // extension bridge (verifies token + contract compatibility in one call).
+  if (method === "GET" && path === "/v1/bridge/handshake") {
+    send(res, 200, {
+      service: "lab-service",
+      labVersion: LAB_VERSION,
+      contractVersion: CONTRACT_VERSION,
+      safetyMode: ctx.config.safetyMode,
+      maxBatchEvents: MAX_BATCH_EVENTS,
+      maxBodyBytes: MAX_BODY_BYTES,
+    });
+    return 200;
   }
 
   // POST /v1/sessions/:id/end
   const endMatch = /^\/v1\/sessions\/([^/]+)\/end$/.exec(path);
   if (method === "POST" && endMatch) {
     const id = decodeURIComponent(endMatch[1] as string);
-    const ok = store.endSession(id, Date.now());
+    const body = ((await readBody(req)) ?? {}) as Record<string, unknown>;
+    // A bridge that was offline delivers the end late; honour the client's end
+    // time (bounded: finite and not in the future) so the timeline stays accurate.
+    const now = Date.now();
+    const endedAt =
+      typeof body.endedAt === "number" && Number.isFinite(body.endedAt) && body.endedAt <= now + 60_000
+        ? Math.floor(body.endedAt)
+        : now;
+    const ok = store.endSession(id, endedAt);
     if (!ok) {
       send(res, 404, { error: "not_found" });
       return 404;
@@ -204,16 +249,62 @@ async function route(
   // POST /v1/events  { events: [...] }
   if (method === "POST" && path === "/v1/events") {
     const body = ((await readBody(req)) ?? {}) as Record<string, unknown>;
+    if (Array.isArray(body.events) && body.events.length > MAX_BATCH_EVENTS) {
+      send(res, 413, { error: "batch_too_large", maxBatchEvents: MAX_BATCH_EVENTS });
+      return 413;
+    }
     const { valid, invalid } = validateEventBatch(body.events);
+    const rawEvents = Array.isArray(body.events) ? (body.events as unknown[]) : [];
+    const idAt = (index: number): string | undefined => {
+      const item = rawEvents[index] as { id?: unknown } | undefined;
+      return item && typeof item.id === "string" ? item.id : undefined;
+    };
+    const invalidDetail: Array<{ index: number; id?: string; code?: string; errors: string[] }> = invalid.map(
+      (i) => {
+        const id = idAt(i.index);
+        return { ...i, ...(id !== undefined ? { id } : {}), code: "INVALID_EVENT" };
+      },
+    );
+
+    // Events for a session the service does not know are reported (not a 500),
+    // so the bridge can re-register the session and resend just those events.
+    const known = new Map<string, boolean>();
+    const accepted: LabEvent[] = [];
+    valid.forEach((ev) => {
+      let k = known.get(ev.sessionId);
+      if (k === undefined) {
+        k = store.hasSession(ev.sessionId);
+        known.set(ev.sessionId, k);
+      }
+      if (k) accepted.push(ev);
+      else {
+        invalidDetail.push({
+          index: rawEvents.indexOf(ev),
+          id: ev.id,
+          code: "UNKNOWN_SESSION",
+          errors: [`unknown session ${ev.sessionId}`],
+        });
+      }
+    });
+
     let stored = 0;
     let quarantined = 0;
-    for (const ev of valid) {
-      const outcome = store.insertEvent(ev);
-      if (outcome === "quarantined") quarantined += 1;
-      else stored += 1;
-      bus.publish({ type: "event", payload: ev });
-    }
-    send(res, 202, { stored, quarantined, invalid: invalid.length, invalidDetail: invalid });
+    let duplicates = 0;
+    const published: LabEvent[] = [];
+    // One transaction per batch: atomic and a single disk sync.
+    store.transaction(() => {
+      for (const ev of accepted) {
+        const outcome = store.insertEvent(ev);
+        if (outcome === "duplicate") duplicates += 1;
+        else {
+          if (outcome === "quarantined") quarantined += 1;
+          else stored += 1;
+          published.push(ev);
+        }
+      }
+    });
+    for (const ev of published) bus.publish({ type: "event", payload: ev });
+    send(res, 202, { stored, quarantined, duplicates, invalid: invalidDetail.length, invalidDetail });
     return 202;
   }
 

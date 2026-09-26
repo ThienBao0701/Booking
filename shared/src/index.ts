@@ -18,6 +18,7 @@ export {
   assertReplayAllowed,
   ReplayNotAuthorizedError,
   requireCapability,
+  isLoopbackUrl,
 } from "./safety/policy.ts";
 
 // Redaction (privacy).
@@ -36,6 +37,7 @@ export {
   validateEvent,
   validateEventBatch,
 } from "./events/validate.ts";
+export * from "./events/recorded.ts";
 export * from "./workflow/types.ts";
 export { validateSessionRecord } from "./workflow/validate.ts";
 export * from "./replay/types.ts";

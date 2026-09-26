@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Lab Recorder</title>
+  <link rel="stylesheet" href="../ui/styles.css" />
+</head>
+<body class="popup">
+  <header>
+    <strong>Browser Automation Lab</strong>
+    <span id="rec" class="pill">idle</span>
+  </header>
+  <section class="grid" aria-live="polite">
+    <div><span class="k">Service</span><span id="svc" class="v">…</span></div>
+    <div><span class="k">Bridge</span><span id="bridge" class="v">…</span></div>
+    <div style="grid-column: span 2"><span class="k">Session</span><span id="session" class="v mono">—</span></div>
+    <div><span class="k">Recorded</span><span id="recorded" class="v">0</span></div>
+    <div><span class="k">Delivered</span><span id="delivered" class="v">0</span></div>
+    <div><span class="k">Queued</span><span id="queued" class="v">0</span></div>
+    <div><span class="k">Dropped / rejected</span><span id="dropped" class="v">0</span></div>
+  </section>
+  <p id="error" class="error" hidden></p>
+  <div class="actions">
+    <button id="start" class="primary">Start recording</button>
+    <button id="stop" class="danger" hidden>Stop recording</button>
+    <button id="flush">Flush now</button>
+    <button id="capture">Screenshot</button>
+  </div>
+  <footer>
+    <a href="#" id="options">Options &amp; pairing</a>
+    <span>Your own session · redacted · local only</span>
+  </footer>
+  <script src="popup.js"></script>
+</body>
+</html>

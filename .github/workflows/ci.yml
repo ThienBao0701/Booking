@@ -9,29 +9,33 @@ permissions:
   contents: read
 
 jobs:
+  # Zero-install job: the core packages have no runtime dependencies and run on
+  # Node's built-in test runner with TypeScript type-stripping and node:sqlite,
+  # so lint, unit, integration and E2E tests need no network install.
   core:
-    name: core (shared contracts + safety + service)
+    name: lint · unit · integration · e2e (zero-install)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      # shared + windows-service are intentionally zero-runtime-dependency and
-      # are tested via Node's built-in runner with TypeScript type-stripping and
-      # the built-in node:sqlite, so this job needs no network install and
-      # always runs.
+      - name: Lint (architecture boundaries, safety rules, manifest policy)
+        run: node --experimental-strip-types scripts/lint.mjs
       - name: Unit test — shared
         run: node --test --experimental-strip-types shared/test/*.test.ts
       - name: Unit + integration test — windows-service
         run: node --test --experimental-strip-types --experimental-sqlite windows-service/test/*.test.ts
       - name: Unit + integration test — mock-extranet
         run: node --test --experimental-strip-types mock-extranet/test/*.test.ts
+      - name: Unit test — extension (recorder, bridge, capture, config, manifest)
+        run: node --test --experimental-strip-types extension/test/*.test.ts
+      - name: E2E — bridge, controller, replay against mock-extranet on 127.0.0.1:4599
+        run: node --test --test-concurrency=1 --experimental-strip-types --experimental-sqlite tests/e2e/*.test.ts
 
-  workspaces:
-    name: build / typecheck / lint (workspaces)
+  build:
+    name: typecheck · build extension · smoke service + mock
     runs-on: ubuntu-latest
-    continue-on-error: true # phases beyond 0 land incrementally
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,13 +44,25 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: "10"
-      - name: Install
-        run: pnpm install --frozen-lockfile || pnpm install
-      - name: Typecheck
-        run: pnpm -r --if-present typecheck
-      - name: Lint
-        run: pnpm -r --if-present lint
-      - name: Test
-        run: pnpm -r --if-present test
-      - name: Build
-        run: pnpm -r --if-present build
+      - name: Install (locked)
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck (all packages + tests)
+        run: pnpm run typecheck
+      - name: Build extension (bundle + artifact verification)
+        run: pnpm run build:extension
+      - name: Smoke — service and mock boot and report healthy
+        run: |
+          export LAB_DATA_DIR="$RUNNER_TEMP/lab" LAB_SERVICE_PORT=4577
+          node --experimental-strip-types --experimental-sqlite windows-service/src/index.ts &
+          node --experimental-strip-types mock-extranet/src/index.ts &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4577/healthz >/dev/null 2>&1 && curl -fsS http://127.0.0.1:4599/healthz >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:4577/healthz
+          curl -fsS http://127.0.0.1:4599/healthz
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-extension
+          path: extension/dist

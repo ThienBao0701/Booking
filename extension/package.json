@@ -1,0 +1,12 @@
+{
+  "name": "@lab/extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome MV3 extension: records the operator's own sessions (redacted at source), buffers locally, and delivers to the loopback lab service via an authenticated bridge.",
+  "type": "module",
+  "scripts": {
+    "build": "node --experimental-strip-types build.mjs",
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json"
+  }
+}

@@ -52,6 +52,10 @@ export function startService(env: ConfigEnv = process.env as ConfigEnv): Promise
   sweep.unref?.();
 
   const server = createApiServer({ config, store, bus, logger, limiter });
+  // Bound slow/stalled clients so a hung bridge connection cannot pin the service.
+  server.headersTimeout = 10_000;
+  server.requestTimeout = 15_000;
+  server.keepAliveTimeout = 5_000;
 
   return new Promise((resolve) => {
     server.listen(config.port, config.host, () => {

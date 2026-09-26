@@ -10,6 +10,7 @@ import { dirname } from "node:path";
 import {
   type LabEvent,
   type SessionRecord,
+  type RunRecord,
   redactValue,
   looksSensitive,
 } from "../shared.ts";
@@ -68,10 +69,14 @@ export class Store {
 
   // ---- sessions ----
 
-  createSession(s: NewSession): void {
-    this.#db
+  /**
+   * Create a session. Idempotent: re-registering an existing id (e.g. a bridge
+   * reconnect) is a no-op and returns false instead of failing.
+   */
+  createSession(s: NewSession): boolean {
+    const r = this.#db
       .prepare(
-        `INSERT INTO sessions(id, started_at, mode, target_kind, target_host, metadata)
+        `INSERT OR IGNORE INTO sessions(id, started_at, mode, target_kind, target_host, metadata)
          VALUES(?,?,?,?,?,?)`,
       )
       .run(
@@ -82,6 +87,27 @@ export class Store {
         s.targetHost ?? null,
         JSON.stringify(s.metadata ?? {}),
       );
+    return r.changes > 0;
+  }
+
+  hasSession(id: string): boolean {
+    return this.#db.prepare("SELECT 1 AS x FROM sessions WHERE id=?").get(id) !== undefined;
+  }
+
+  /**
+   * Run `fn` inside a single SQLite transaction (atomic batch + one fsync
+   * instead of one per row — Component 16 "minimal disk writes").
+   */
+  transaction<T>(fn: () => T): T {
+    this.#db.exec("BEGIN");
+    try {
+      const out = fn();
+      this.#db.exec("COMMIT");
+      return out;
+    } catch (err) {
+      this.#db.exec("ROLLBACK");
+      throw err;
+    }
   }
 
   endSession(id: string, endedAt: number): boolean {
@@ -124,8 +150,11 @@ export class Store {
    * Persist a validated event. Redaction is re-applied defensively; if the
    * payload still looks sensitive it is quarantined (data replaced with a marker)
    * rather than stored raw. Returns the action taken.
+   *
+   * Idempotent on `id`: re-sending an already-stored event (a bridge retry after
+   * a lost response) returns "duplicate" instead of failing the batch.
    */
-  insertEvent(ev: LabEvent): "stored" | "quarantined" {
+  insertEvent(ev: LabEvent): "stored" | "quarantined" | "duplicate" {
     const safeData = redactValue(ev.data);
     let dataStr = JSON.stringify(safeData);
     let quarantined = false;
@@ -133,9 +162,9 @@ export class Store {
       dataStr = JSON.stringify({ quarantined: true, reason: "post-redaction sensitive match" });
       quarantined = true;
     }
-    this.#db
+    const r = this.#db
       .prepare(
-        `INSERT INTO events(id, session_id, seq, ts, tab_id, kind, category, workflow, severity, redacted, data)
+        `INSERT OR IGNORE INTO events(id, session_id, seq, ts, tab_id, kind, category, workflow, severity, redacted, data)
          VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .run(
@@ -151,6 +180,7 @@ export class Store {
         1,
         dataStr,
       );
+    if (r.changes === 0) return "duplicate";
     return quarantined ? "quarantined" : "stored";
   }
 
@@ -165,6 +195,72 @@ export class Store {
     return this.#db
       .prepare("SELECT * FROM events WHERE session_id=? ORDER BY seq ASC LIMIT ?")
       .all(sessionId, limit) as unknown as StoredEventRow[];
+  }
+
+  // ---- replay runs (docs/04-replay-format.md run record) ----
+
+  /** Upsert a replay run record and its step results atomically. */
+  saveRun(run: RunRecord): void {
+    this.transaction(() => {
+      this.#db
+        .prepare(
+          `INSERT INTO runs(run_id, workflow, mode, started_at, ended_at, status, checkpoints, source_session_id, dry_run)
+           VALUES(?,?,?,?,?,?,?,?,?)
+           ON CONFLICT(run_id) DO UPDATE SET
+             ended_at=excluded.ended_at, status=excluded.status,
+             checkpoints=excluded.checkpoints, dry_run=excluded.dry_run`,
+        )
+        .run(
+          run.runId,
+          run.workflow,
+          run.mode,
+          run.startedAt,
+          run.endedAt ?? null,
+          run.status,
+          JSON.stringify(run.checkpoints),
+          run.sourceSessionId ?? null,
+          run.dryRun ? 1 : 0,
+        );
+      const upsertStep = this.#db.prepare(
+        `INSERT INTO run_steps(run_id, step_id, status, started_at, ended_at, attempts, error)
+         VALUES(?,?,?,?,?,?,?)
+         ON CONFLICT(run_id, step_id) DO UPDATE SET
+           status=excluded.status, started_at=excluded.started_at, ended_at=excluded.ended_at,
+           attempts=excluded.attempts, error=excluded.error`,
+      );
+      for (const s of run.steps) {
+        upsertStep.run(run.runId, s.id, s.status, s.startedAt ?? null, s.endedAt ?? null, s.attempts, s.error ?? null);
+      }
+    });
+  }
+
+  getRun(runId: string): RunRecord | undefined {
+    const row = this.#db.prepare("SELECT * FROM runs WHERE run_id=?").get(runId) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) return undefined;
+    const steps = this.#db
+      .prepare("SELECT * FROM run_steps WHERE run_id=? ORDER BY rowid ASC")
+      .all(runId) as Array<Record<string, unknown>>;
+    return {
+      runId: row.run_id as string,
+      workflow: row.workflow as string,
+      mode: row.mode as string,
+      startedAt: row.started_at as number,
+      ...(row.ended_at != null ? { endedAt: row.ended_at as number } : {}),
+      status: row.status as RunRecord["status"],
+      checkpoints: JSON.parse(row.checkpoints as string) as string[],
+      ...(row.source_session_id != null ? { sourceSessionId: row.source_session_id as string } : {}),
+      dryRun: row.dry_run === 1,
+      steps: steps.map((s) => ({
+        id: s.step_id as string,
+        status: s.status as RunRecord["steps"][number]["status"],
+        ...(s.started_at != null ? { startedAt: s.started_at as number } : {}),
+        ...(s.ended_at != null ? { endedAt: s.ended_at as number } : {}),
+        attempts: s.attempts as number,
+        ...(s.error != null ? { error: s.error as string } : {}),
+      })),
+    };
   }
 
   // ---- maintenance ----
