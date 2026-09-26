@@ -1,144 +1,126 @@
 # STEALTH BROWSER AUTOMATION LAB
 
 A **local, single-operator diagnostics & authorized-automation lab** for
-browser / Extranet workflows. It lets you **observe → reproduce → analyze →
-debug → improve** your *own* authenticated workflows in a controlled lab —
-including a bundled **mock Extranet** — instead of experimenting on a live
-production account.
+browser / Extranet workflows. It lets you **observe → record → reproduce →
+analyze → debug** your *own* workflows in a controlled lab — including a
+bundled **mock Extranet** — instead of experimenting on a live production
+account.
 
 > ### Scope & safety (read this first)
 >
-> This is a **diagnostics / QA / authorized-automation** tool. It is **not** an
-> evasion tool. The following are **deliberately not implemented** and are
-> enforced-unavailable in code (`shared/src/safety`, tested in
-> `shared/test/safety.test.ts`):
+> This is a **diagnostics / QA / authorized-automation** tool. Despite the
+> project name, it is **not** an evasion tool and nothing in it is hidden: the
+> extension shows a **REC** badge while recording, and controllers act as
+> ordinary, identifiable clients. The following are **deliberately not
+> implemented** and are enforced-unavailable in code (`shared/src/safety`),
+> in the extension manifest policy, and in the lint:
 > anti-detection · stealth evasion · fingerprint spoofing · IP rotation ·
 > CAPTCHA bypass · bot-detection bypass · fake/synthetic human behavior.
 >
-> - Record only your **own** sessions. Never captures passwords, payment data,
->   tokens, or auth secrets (`docs/06-privacy-model.md`).
-> - **Replay runs only against the bundled mock environment or an
->   operator-declared authorized target** (`docs/07-safety-modes.md`).
-> - Request observability is **read-only metadata** — it never modifies, forges,
->   or evades server-side security controls.
+> - Record only your **own** sessions. Field values, passwords, payment data,
+>   tokens and auth secrets are never captured ([privacy model](docs/06-privacy-model.md)).
+> - **Replay runs only against the bundled mock (loopback) or an
+>   operator-declared authorized target**, decided before any action runs
+>   ([safety modes](docs/07-safety-modes.md)).
+> - Everything stays on this machine: services bind to 127.0.0.1; the extension
+>   only talks to a loopback service.
 > - Use it only on systems you own or are explicitly authorized to test, within
->   those systems' Terms of Service and applicable law (see `LICENSE`).
+>   their Terms of Service and applicable law (see `LICENSE`).
 
 ## Status
 
-Built in phases (see `docs/adr/` and the phase list below). **Phases 0, 3, and 5
-are complete** and fully tested (75 tests, zero-install): the `shared` contracts +
-safety + redaction core, the local background service (loopback API, event bus,
-SQLite/WAL, watchdog), and the mock Extranet (safe replay target that emits the
-full workflow-event set).
-
 | Phase | Component | State |
 |------:|-----------|-------|
-| 0 | Architecture, docs, `shared` contracts/safety/redaction | ✅ done, tested |
-| 3 | Local background service (localhost API, event bus, SQLite, watchdog) | ✅ done, tested |
-| 5 | Mock Extranet (safe automation target) | ✅ done, tested |
-| 1 | MV3 extension skeleton (least-privilege) | ⬜ next |
-| 2 | Event recorder | ⬜ |
-| 4 | Bridge (extension ↔ service) | ⬜ |
-| 6–10 | Controller · replay engine · analyzer · dashboard · reports | ⬜ |
-| 11–15 | Security hardening · tests · CI · installer | ⬜ (CI + tests scaffolded) |
+| 0 | Architecture, docs, `shared` contracts / safety / redaction | ✅ |
+| 1 | MV3 extension (least privilege, service worker, content script, popup, options) | ✅ |
+| 2 | Event recorder (standardized schema, debounce, batching, queue, retry, dedup) | ✅ |
+| 3 | Local background service (loopback API, event bus, SQLite/WAL, watchdog) | ✅ |
+| 4 | Bridge extension ↔ service (auth, origin, validation, timeout, reconnect, health) | ✅ |
+| 5 | Mock Extranet (safe automation target) | ✅ |
+| 6 | BrowserController interface + mock controller | ✅ |
+| 7 | Replay engine (start/pause/resume/stop/step/retry/checkpoint/rollback/dryRun) + recording → workflow + CLI | ✅ |
+| 8–10 | Analyzer · dashboard · reports | ⬜ next |
+| 11–15 | Security hardening · packaging · Windows installer | ⬜ (CI, lint, tests in place) |
+
+**Tests:** 201 unit · 13 E2E on the mock at 127.0.0.1:4599 · 2 real-browser
+(built extension in Chromium). Lint, typecheck (6 configs) and the verified
+extension build run in CI. See [docs/10-testing.md](docs/10-testing.md).
+
+## Quick start
+
+Requires **Node ≥ 22** and pnpm 10 ([full guide](docs/11-installation.md)).
+
+```bash
+pnpm install
+pnpm run verify                  # lint + typecheck + unit + E2E + extension build
+
+pnpm run start:service           # local service → http://127.0.0.1:4577 (token in .lab-runtime/auth-token.txt)
+pnpm run start:mock              # mock Extranet  → http://127.0.0.1:4599
+pnpm run build:extension         # load extension/dist unpacked, paste the token in Options
+
+pnpm run replay:example          # replay all ten mock modules (SIMULATE mode)
+```
+
+## How it fits together
+
+```
+Chrome ── MV3 extension ── bridge (loopback, token) ──► local service ──► SQLite
+             records your                                   │
+             own session                                    ├─► recording → workflow draft
+             (redacted)                                     └─► ReplayEngine ─(authorized?)─► BrowserController ─► mock Extranet
+```
+
+Full detail: [docs/01-architecture.md](docs/01-architecture.md) (v1.1) and
+[ADR-0004](docs/adr/0004-automation-engine-and-target-hardening.md).
 
 ## Repository layout
 
 ```
-stealth-browser-automation-lab/
-  shared/           # contracts: event/workflow/replay schema, safety, redaction (done)
-  extension/        # MV3 extension (phase 1+)
-  windows-service/  # local background service (phase 3+)
-  mock-extranet/    # safe automation target (phase 5+)
-  dashboard/        # web dashboard (phase 9+)
-  docs/             # source-of-truth documentation + ADRs
-  .github/workflows # CI
+shared/            contracts: event / recorder / workflow / replay schema, safety policy, redaction
+extension/         MV3 recorder: service worker, content script, recorder, bridge, popup, options
+windows-service/   loopback API, event bus, SQLite, watchdog; src/automation: controller, replay engine, CLI
+mock-extranet/     safe local Extranet (login, property, rooms, rates, reservations, messages, reviews, photos, reports)
+dashboard/         (Phase 9)
+examples/          runnable workflow files
+tests/             cross-package E2E (tests/e2e) and real-browser tests (tests/browser)
+scripts/lint.mjs   architecture + safety lint
+docs/              source-of-truth documentation + ADRs
 ```
 
-## Architecture
-
-```
-Chrome/Chromium/Edge → MV3 Extension → localhost/native bridge →
-Local Background Service (event bus + SQLite/WAL + watchdog) →
-Automation Engine (BrowserController) → Analyzer → Dashboard + Reports
-```
-
-Full detail: **`docs/01-architecture.md`**. The architecture is treated as the
-source of truth; boundary changes go through an ADR (`docs/adr/`).
-
-## Installation (developer, current phase)
-
-Requires **Node ≥ 22** (for TypeScript type-stripping; no build step needed for
-dev/test).
-
-```bash
-# Run the safety-critical core + service test suite — zero install required:
-node --test --experimental-strip-types shared/test/*.test.ts
-node --test --experimental-strip-types --experimental-sqlite windows-service/test/*.test.ts
-
-# Or via npm scripts (workspaces):
-npm run test:core        # shared + service
-npm run test:shared      # shared only
-
-# Start the local service (loopback only):
-node --experimental-strip-types --experimental-sqlite windows-service/src/index.ts
-
-# Start the mock Extranet (safe replay target):
-node --experimental-strip-types mock-extranet/src/index.ts   # http://127.0.0.1:4599
-
-# Typecheck the contracts (requires TypeScript, installed via pnpm/npm):
-pnpm install            # or: npm install
-pnpm -C shared typecheck
-```
-
-Windows installer, service auto-start, and extension packaging land in Phase 12
-/ 15 (`docs/` will carry the end-user install steps then).
-
-## Permissions (extension, planned — least privilege)
-
-No `<all_urls>`. The extension will request the minimum required, preferring
-`activeTab` / optional host permissions for the specific target being debugged.
-The full permission table lands with Phase 1 in `extension/manifest.json` and is
-governed by `docs/05-security-model.md`.
-
-## Key references
+## Documentation
 
 | Topic | Document |
 |-------|----------|
-| Architecture | `docs/01-architecture.md` |
-| Event schema | `docs/02-event-schema.md` |
-| Workflow schema | `docs/03-workflow-schema.md` |
-| Replay format | `docs/04-replay-format.md` |
-| Security model | `docs/05-security-model.md` |
-| Privacy model | `docs/06-privacy-model.md` |
-| Safety modes & exclusions | `docs/07-safety-modes.md` |
-| Data model (SQLite) | `docs/08-data-model.md` |
-| Troubleshooting | `docs/09-troubleshooting.md` |
-| Testing | `docs/10-testing.md` |
-| ADRs | `docs/adr/` |
+| Architecture | [01-architecture](docs/01-architecture.md) |
+| Event schema (+ recorder schema) | [02-event-schema](docs/02-event-schema.md) |
+| Workflow schema & detection | [03-workflow-schema](docs/03-workflow-schema.md) |
+| Replay format, engine, CLI | [04-replay-format](docs/04-replay-format.md) |
+| Security model | [05-security-model](docs/05-security-model.md) |
+| Privacy model | [06-privacy-model](docs/06-privacy-model.md) |
+| Safety modes & exclusions | [07-safety-modes](docs/07-safety-modes.md) |
+| Data model (SQLite) | [08-data-model](docs/08-data-model.md) |
+| Troubleshooting | [09-troubleshooting](docs/09-troubleshooting.md) |
+| Testing | [10-testing](docs/10-testing.md) |
+| Installation | [11-installation](docs/11-installation.md) |
+| Chrome extension setup | [12-chrome-extension-setup](docs/12-chrome-extension-setup.md) |
+| Windows service setup | [13-windows-service-setup](docs/13-windows-service-setup.md) |
+| ADRs | [docs/adr](docs/adr/) |
 
-## Safety modes (Component 12)
+## Safety modes
 
 | Mode | Recording | Replay side effects | Allowed targets |
 |------|-----------|---------------------|-----------------|
 | `OBSERVE` (default) | yes | none | none |
-| `SIMULATE` | yes | mock only | mock |
-| `AUTHORIZED_AUTOMATION` | yes | yes | mock **or** authorized (with authorization record) |
-
-## Testing
-
-`shared` is tested with Node's built-in runner (no external deps). See
-`docs/10-testing.md`. CI (`.github/workflows/ci.yml`) always runs the `shared`
-safety/contract suite; per-package build/lint/test jobs come online as each
-phase lands.
+| `SIMULATE` | yes | mock only | `mock` (loopback URL) |
+| `AUTHORIZED_AUTOMATION` | yes | yes | mock **or** authorized (with authorization record, stored per run) |
 
 ## Production deployment
 
-Deferred to Phases 11–15 (security hardening, packaging, Windows installer with
-service auto-recovery). The design targets: localhost-only binding, auth token +
-origin validation + rate limiting, SQLite WAL, event batching, and a watchdog
-for crash recovery — see `docs/05-security-model.md` and `docs/08-data-model.md`.
+Current release: run the service under the watchdog, auto-started at logon on
+Windows ([doc 13](docs/13-windows-service-setup.md)); load the built extension
+unpacked. Planned (Phases 11–15): security hardening pass, signed extension
+package, `setup.exe` that installs Node, the service (as a Windows service with
+job-object supervision) and the extension helper.
 
 ## License
 

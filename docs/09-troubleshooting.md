@@ -1,39 +1,82 @@
 # 09 — Troubleshooting
 
-## Shared core (available now)
+## Toolchain
 
-- **`node --test` fails with a syntax error on `.ts`** — requires Node ≥ 22.
-  Check `node -v`. The shared package uses erasable TypeScript + type stripping.
-- **Type errors** — run `pnpm -C shared typecheck`. The shared package must stay
-  zero-runtime-dependency and erasable-syntax only (`erasableSyntaxOnly` in
-  `tsconfig.base.json`), so no `enum` / `namespace` / parameter-properties.
+- **`node --test` fails with a syntax error on `.ts`** — requires Node ≥ 22
+  (type-stripping + `node:sqlite`). Check `node -v`.
+- **`tsc` / `esbuild` not found** — run `pnpm install` at the repo root (the dev
+  toolchain is declared in the root `package.json`, locked in `pnpm-lock.yaml`).
+- **Lint fails with `boundary/…`** — a package imports a sibling or imports
+  `shared` outside its `src/shared.ts`; see `docs/01-architecture.md` §3.
+- **`pnpm install` marks `src/index.ts` executable** — pnpm links workspace
+  `bin` entries; restore with `chmod 644` (no content change).
 
-## Service (Phase 3+)
+## Service
 
-- **Extension cannot reach the service** — confirm the service is running and
-  bound to `127.0.0.1:<port>`; check the auth token file exists and the
-  extension has the same token; check the health endpoint
-  `GET http://127.0.0.1:<port>/healthz`.
-- **`401 Unauthorized`** — token mismatch; re-run the pairing step so the
-  extension and service share the token.
-- **`403 Forbidden` on control routes** — `Origin`/`Host` validation rejected
-  the request (possible DNS-rebinding guard); ensure you are calling from the
-  extension or `127.0.0.1`.
-- **Service died / recovered** — the watchdog restarts it and replays the WAL;
-  check rolling logs for the crash record. Buffered extension events drain on
-  reconnect.
+- **Extension cannot reach the service** — is it running
+  (`pnpm run start:service`)? `curl http://127.0.0.1:4577/healthz` should return
+  `{"status":"ok",…}`.
+- **`401 Unauthorized`** — token mismatch. Copy
+  `<LAB_DATA_DIR>/auth-token.txt` into the extension Options and click
+  **Test connection**. The popup shows `Delivery paused (auth)`; queued events
+  are kept and delivered after re-pairing.
+- **`403 forbidden_origin` / `forbidden_host`** — a web page (not the extension)
+  called the API, the Host header is not the bound loopback host:port, or
+  `LAB_ALLOWED_ORIGINS` pins a different extension id.
+- **`413` / `400` on `/v1/events`** — batch > 500 events or body > 2 MiB / bad
+  JSON; the bridge splits batches automatically.
+- **Service died** — run it under the watchdog (`pnpm run start:watchdog`); it
+  restarts with backoff. Data survives restarts (SQLite WAL); the extension
+  keeps queued events and resends them (duplicates are ignored).
+- **`another watchdog is running`** — a live watchdog holds
+  `<LAB_DATA_DIR>/watchdog.lock`; a stale lock (dead pid) is taken over
+  automatically.
+- **Events stored with `{"quarantined":true}`** — the payload still looked
+  sensitive after redaction (e.g. an email, a long digit run, or a 9+ digit
+  number such as an epoch timestamp inside `data`). Keep times in the envelope.
+
+## Extension
+
+- **Popup says "not paired"** — set the token in Options.
+- **Nothing recorded on a site** — only loopback and origins you added in
+  Options are recordable; after adding an origin, reload its tabs (the content
+  script is registered for new page loads). Check the REC badge is on.
+- **Bridge state `offline`** — the service is down; events wait in IndexedDB
+  and are flushed automatically on reconnect (backoff up to 60 s, plus a 30 s
+  alarm).
+- **Bridge state `incompatible`** — the service's contract version differs or
+  the URL is not a lab service; update both to the same release.
+- **Chrome asks about local network access** — allow it for the extension if
+  your Chrome version prompts; the service is on 127.0.0.1 only.
+- **Changes to options not applied** — the service worker reloads config on
+  every save; a service URL that is not loopback is rejected and the default
+  `http://127.0.0.1:4577` is used.
 
 ## Replay
 
-- **"target not authorized"** — the target is neither `mock` nor an `authorized`
-  target with an authorization record; either switch to `mock`/`SIMULATE` or
-  supply the authorization record and `AUTHORIZED_AUTOMATION` mode.
-- **Step timeout** — increase `defaults.timeoutMs` or the step's `timeoutMs`;
-  use `dry-run` to validate the plan without side effects.
+- **`denied: … (MODE_FORBIDS_SIDE_EFFECTS)`** — OBSERVE never replays; use
+  `--mode SIMULATE` for the mock.
+- **`MOCK_TARGET_NOT_LOCAL`** — a `mock` target must be 127.0.0.1/localhost;
+  for any other system use `kind: "authorized"` + an authorization record +
+  `AUTHORIZED_AUTOMATION` (and a browser-backed controller adapter).
+- **`missing parameter: x`** — supply `--param x=value` or `--params-file`;
+  `--dry-run` lists all required parameters.
+- **`NOT_VISIBLE`** — the element is in another view; add a navigation click
+  (e.g. `button[data-view="rooms"]`) before it.
+- **`OPTION_NOT_FOUND` / `UNRESOLVED_REFERENCE`** — `$last` needs an entity
+  created earlier in the same run; create it first or pass a real id.
+- **`no element matches …` on a converted recording** — the recording touched
+  an element the target does not have; remove that step from the draft.
+- **Step timeout** — raise `timeoutMs` for the step or `defaults.timeoutMs`;
+  transient failures retry up to `retries`.
+- **Rollback did not undo data in the mock** — by design: rollback restores
+  the page model and run position only (ADR-0004).
 
-## Data / performance
+## Tests
 
-- **Database locked** — WAL should prevent this; ensure only one service
-  instance runs (the watchdog enforces a single instance via a lock file).
-- **High disk writes** — event batching + debounce are tunable in config; see
-  `docs/16 performance` notes in the README.
+- **E2E suite reuses my running mock** — by design (`ensureMock()`); it creates
+  test entities there but never stops or restarts it. Set `MOCK_EXTRANET_URL`
+  to a different loopback port to isolate.
+- **Browser E2E skipped** — install Chromium for playwright-core
+  (`node node_modules/playwright-core/cli.js install chromium`) or set
+  `LAB_CHROMIUM_PATH`.

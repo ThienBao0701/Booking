@@ -1,44 +1,58 @@
 # 10 — Testing Strategy (Component 14)
 
-## Layers
+## Suites
 
-| Layer                | Where                         | Runner                         |
-|----------------------|-------------------------------|--------------------------------|
-| Unit                 | each package `*/test`         | `node --test` (type-stripping) |
-| Contract/schema      | `shared/test`                 | `node --test`                  |
-| Integration          | service ⇄ mock-extranet       | `node --test` + ephemeral svc  |
-| Extension            | recorder/redaction units + harness | `node --test` / Playwright |
-| Replay               | replay engine vs mock         | `node --test`                  |
-| Persistence          | SQLite read/write/vacuum      | `node --test` + tmp db         |
-| Crash recovery       | kill + restart + WAL replay   | `node --test` (spawn)          |
+| Suite | Where | Command | Install needed |
+|---|---|---|---|
+| Unit — shared contracts, safety, redaction | `shared/test` | `pnpm run test:shared` | no |
+| Unit + integration — service (auth, security, store, ingestion, watchdog, controller, replay engine, converter, routes) | `windows-service/test` | `pnpm run test:service` | no |
+| Unit + integration — mock Extranet | `mock-extranet/test` | `pnpm run test:mock` | no |
+| Unit — extension (recorder, bridge, capture, config, manifest policy) | `extension/test` | `pnpm run test:extension` | no |
+| E2E — bridge, controller, replay on the mock at 127.0.0.1:4599 | `tests/e2e` | `pnpm run test:e2e` | no |
+| Real-browser E2E — built extension in Chromium | `tests/browser` | `pnpm run test:browser` | Chromium (skips without) |
 
-## Available now (Phase 0)
+`pnpm run test` = unit + E2E. `pnpm run verify` = lint + typecheck + test + build.
 
-The `shared` package is fully unit-tested with **zero install**:
+Counts at this revision: **201 unit** (54 shared · 77 service · 11 mock ·
+59 extension), **13 E2E**, **2 real-browser**. The original 75 tests are
+unchanged and still pass.
 
-```bash
-node --test --experimental-strip-types shared/test/*.test.ts
-# or
-npm run test:shared
-```
+## What the E2E suites prove
 
-Covers: id/time helpers, event validation, workflow validation, replay
-validation + target guard, **safety policy** (modes + forbidden-capability
-denylist), and **redaction** (secrets/PII masking).
+- **Bridge (4):** recorder → bridge (real `fetch`) → real service: ordered,
+  labelled, redacted at rest; service restart while offline → no loss, no
+  duplicates; database reset → re-registration; wrong token → paused without loss.
+- **Controller (4):** page-map **contract** against the mock's served HTML;
+  all ten modules driven end-to-end (mock emits LOGIN → … → REPORTING); real
+  server validation surfaces; controller cannot target non-local systems.
+- **Replay (5):** example workflow on the mock (persisted, params never stored);
+  dry-run and denials with **zero** mock side effects; step/checkpoint/rollback;
+  CLI as a child process; **OBSERVE → RECORD → REPRODUCE** (extension capture
+  rules on the real mock HTML → recorder → bridge → service → draft → replay).
+- **Browser (2):** the built extension in Chromium records real clicks/typing;
+  no typed value or secret reaches the service; REC badge; session ends; the
+  recording replays; a tampered off-box service URL is refused.
 
-## CI pipeline (Component 14)
+## The mock at 127.0.0.1:4599
 
-`.github/workflows/ci.yml`:
-
-1. `shared` job — always runs, no network (built-in test runner).
-2. `workspaces` job — install + typecheck + lint + test + build across
-   packages as they land (non-blocking until each phase is complete).
-
-Target order mirrors the spec: lint → typecheck → unit → integration →
-build extension → build service → build dashboard.
+E2E tests target `MOCK_EXTRANET_URL` (default `http://127.0.0.1:4599`, must be
+loopback). A mock already running there is **reused and left running**; if none
+is running the harness starts one in-process and stops it afterwards. Tests
+scope assertions to their own actor/entities, so a shared mock is fine. Run E2E
+with `--test-concurrency=1` (the scripts do).
 
 ## Principles
 
-- Safety and redaction are the highest-priority test targets: a regression that
-  weakens them must fail CI.
-- Tests are deterministic; time and ids are injectable so runs are reproducible.
+- Safety, privacy and authorization are the highest-priority test targets; a
+  regression that weakens them fails CI (policy tests, manifest policy, lint
+  rules proven against planted violations, zero-side-effect denial tests).
+- Deterministic: fake timers/ids for the recorder and bridge; scriptable fake
+  controller for the engine; real components end-to-end.
+- Every root-cause fix ships with a regression test.
+
+## CI (`.github/workflows/ci.yml`)
+
+1. **core** (zero install): lint → unit (all packages) → E2E.
+2. **build** (locked install): typecheck → build extension (+ artifact
+   verification) → service/mock boot smoke test → upload `extension/dist`.
+3. **browser**: install Chromium → real-browser E2E.

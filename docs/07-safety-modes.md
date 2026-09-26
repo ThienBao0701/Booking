@@ -13,7 +13,9 @@ configuration flag, env var, or API call can enable a forbidden capability.
 | `AUTHORIZED_AUTOMATION`| yes       | yes                 | `mock` **or** `authorized` (with authorization record) |
 
 - Default mode is `OBSERVE`.
-- `SIMULATE` runs replays but forces the target to the mock environment.
+- `SIMULATE` runs replays against the mock environment only. A `mock` target
+  must be a **loopback URL** (127.0.0.1 / localhost / [::1]); a real system
+  labelled "mock" is denied with `MOCK_TARGET_NOT_LOCAL` (ADR-0004).
 - `AUTHORIZED_AUTOMATION` permits replay against an operator-declared authorized
   target. Selecting it requires an `authorization` record (owner, system,
   granted-by, acknowledgement timestamp). The tool records this record with each
@@ -35,6 +37,16 @@ asserts none is ever marked available:
 
 Any code path that requests one of these throws `ForbiddenCapabilityError` and
 is rejected at the policy boundary. Adding such a capability would fail CI.
+
+## Where the policy is enforced
+
+| Layer | Enforcement |
+|---|---|
+| `shared/src/safety` | modes, forbidden-capability denylist, target guard (`evaluateReplay`) — unit-tested |
+| Replay engine | authorization before any controller call; mock-only mode; params never persisted |
+| Controller | bound to one origin; `MockExtranetController` refuses non-loopback targets |
+| Extension | least-privilege manifest policy (tests + build + lint); loopback-only bridge |
+| Lint (`scripts/lint.mjs`) | forbidden capability names and evasion APIs (navigator/screen overrides, `chrome.proxy`, `chrome.debugger`) rejected in source |
 
 ## Request observability, not manipulation (Component 7)
 

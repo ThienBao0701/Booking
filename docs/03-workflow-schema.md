@@ -47,10 +47,24 @@ Rendered timeline (dashboard / report):
 ## Workflow detection
 
 Detection is heuristic and declarative: a small ruleset maps
-(url pattern, page markers, event kind) → workflow label. Rules live in config,
-not hard-coded logic, so they can be tuned without code changes (Engineering
-Bible: business rules belong in configuration). A detection that is ambiguous
-yields `UNKNOWN` rather than a guess.
+(active SPA view, path pattern, action, target pattern) → workflow label.
+Rules are data (`extension/src/recorder/workflow-rules.ts`,
+`DEFAULT_WORKFLOW_RULES`), evaluated in order, first full match wins, so they
+can be tuned without changing the recorder (business rules belong in
+configuration). A detection that is ambiguous yields `UNKNOWN` rather than a
+guess.
+
+Default rules: cancellation (a click/submit whose target matches `data-cancel`
+or "cancel reservation/booking", or a `cancel` target inside the reservations
+view, or a `/reservations/…/cancel` path) → the mock's views (`login`,
+`property`, `rooms`, `rates`, `reservations`, `messages`, `reviews`, `photos`,
+`reports`) → Extranet-style paths (`/sign-in`, `/rooms`, `/rates|/pricing|
+/availability|/calendar`, `/reservations|/bookings`, `/inbox|/messages`,
+`/reviews`, `/photos|/gallery`, `/reports|/analytics`, `/property|/hotel`).
+
+The recorder emits a `workflow_transition` event (`metadata.from`, `.to`,
+`.trigger`) whenever the detected workflow changes within a tab; those events
+form the timeline below.
 
 ## Per-step record
 

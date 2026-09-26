@@ -6,9 +6,13 @@ tables are local; ids come from `shared/src/ids.ts`.
 ## Tables (implemented — `windows-service/src/db/schema.ts`)
 
 Status: `sessions`, `events`, `findings`, `runs`, `run_steps`, and `meta` are
-implemented and covered by tests. `workflows`, `screenshots`, and
-`environment_reports` are defined below and land with their owning phases
-(5/2/8 respectively).
+implemented and covered by tests. `runs`/`run_steps` are written by the replay
+engine (`Store.saveRun`, upsert after every change) and read by
+`GET /v1/runs/:id`. Ingestion is idempotent on `events.id` and
+`sessions.id`, and each batch is one transaction. `workflows`, `screenshots`
+and `environment_reports` are defined below and land with their owning phases
+(workflow files currently live on disk, e.g. `examples/workflows/`; screenshots
+are recorded as SCREENSHOT events with sha256 + size only).
 
 
 ### `sessions`
@@ -43,7 +47,11 @@ Indexes: `(session_id, seq)`, `(session_id, kind)`, `(ts)`, `(workflow)`.
 Saved replay workflow files (see `docs/04-replay-format.md`).
 
 ### `runs` / `run_steps`
-Replay run records and per-step results (see replay format).
+Replay run records and per-step results (see replay format). `runs.target`
+(JSON) stores the replay target including its **authorization record**, so the
+authorization basis of every run is traceable. Added as a backward-compatible
+column migration (`ADDED_COLUMNS` in `schema.ts`); `SCHEMA_VERSION` changes
+only for breaking changes.
 
 ### `findings`
 Analyzer output (see `docs/02` categories). Non-conclusive by construction:

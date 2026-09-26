@@ -29,7 +29,7 @@ Aligned to Component 6 rule categories:
 - `TAB_LIFECYCLE` — created / activated / updated / removed.
 - `PAGE_STATE` — ready-state / route / view detection.
 - `DOM_CHANGE` — debounced mutation summary (counts + selectors, never values).
-- `FORM_ACTIVITY` — focus/change/submit on a field (field **name only**, never value unless allow-listed non-sensitive).
+- `FORM_ACTIVITY` — change/submit on a field: structural descriptor plus `filled: true|false`. Field **values are never read**; sensitive fields (password, OTP, card, IBAN, token, …) are recorded as `sensitive: true` without even a filled bit.
 - `CLICK` — element click (role/label/selector).
 - `SESSION_CHANGE` — session start/end, auth-state transition (boolean only).
 - `SCREENSHOT` — screenshot captured (path/hash + trigger action).
@@ -73,7 +73,83 @@ millisecond. See `shared/src/time.ts`.
 
 ## Redaction contract
 
-`redacted` MUST be `true` before an event is persisted. The content script sets
-it after applying `shared/src/redaction`. The service re-validates and re-runs
-redaction defensively; an event failing validation is quarantined to the error
-log, never silently dropped. See `docs/06-privacy-model.md`.
+`redacted` MUST be `true` before an event is persisted. The recorder's
+`toLabEvent` conversion always runs `shared/src/redaction` and then sets it. The
+service re-validates and re-runs redaction defensively:
+
+- an event that fails validation (e.g. `redacted !== true`) is **rejected and
+  reported** per event in the ingestion response (`invalidDetail[]` with
+  `code: "INVALID_EVENT"`), never stored;
+- an event whose payload still looks sensitive after redaction is stored with
+  its `data` replaced by a quarantine marker (the raw payload never reaches disk).
+
+Note: the post-redaction check also scans JSON numbers, so a number of 9+ digits
+inside `data` (e.g. an epoch-ms timestamp) triggers quarantine. Put times in the
+envelope (`ts`), never in `data`. See `docs/06-privacy-model.md`.
+
+## Recorder view (standardized recorder schema)
+
+Canonical definition: `shared/src/events/recorded.ts`. The extension's recorder
+works with `RecordedEvent`, whose fields are the standardized recorder schema.
+It converts losslessly to the wire envelope above (the service contract is
+unchanged):
+
+| RecordedEvent | LabEvent (wire)        | Notes |
+|---------------|------------------------|-------|
+| `event_id`    | `id`                   | sortable id |
+| `session_id`  | `sessionId`            | |
+| `seq`         | `seq`                  | gap-free per session (assigned after dedup) |
+| `timestamp`   | `ts`                   | epoch ms |
+| `tab_id`      | `tabId`                | optional |
+| `page`        | `data.page`            | **path only** — query string and fragment are dropped, path redacted |
+| `workflow`    | `workflow`             | detected label, `UNKNOWN` when ambiguous |
+| `action`      | `data.action` → `kind` | see mapping below |
+| `target`      | `data.target`          | structural element descriptor, never a value |
+| `metadata`    | `data.metadata`        | redacted; raw-content keys (`value`, `innerText`, …) stripped |
+| `severity`    | `severity`             | default `info` (`error` for `error` actions) |
+
+Recorder actions → event kinds:
+
+| action | kind |
+|---|---|
+| `session_start`, `session_end` | `SESSION_CHANGE` |
+| `tab_created`, `tab_activated`, `tab_updated`, `tab_closed` | `TAB_LIFECYCLE` |
+| `navigate` | `NAVIGATION` |
+| `page_load`, `page_state` | `PAGE_STATE` |
+| `dom_change` | `DOM_CHANGE` |
+| `click` | `CLICK` |
+| `input`, `change`, `submit` | `FORM_ACTIVITY` |
+| `screenshot` | `SCREENSHOT` |
+| `http` | `HTTP_STATUS` |
+| `workflow_transition` | `WORKFLOW_TRANSITION` |
+| `error` | `ERROR` |
+
+Example (a click in the mock's reservations view):
+
+```jsonc
+{
+  "event_id": "01M3E3772WR1AV800WAX1XZBX3",
+  "session_id": "session_01M3E36Z…",
+  "seq": 42,
+  "timestamp": 1790400813248,
+  "tab_id": 7,
+  "page": "/",
+  "workflow": "CANCELLATION",
+  "action": "click",
+  "target": { "tag": "button", "selector": "button[data-cancel]" },
+  "metadata": {}
+}
+```
+
+### Recorder pipeline guarantees
+
+- **Debounce:** DOM mutations are summarized per quiet period (default
+  500 ms, max wait 5 s); deliveries are debounced (default 2 s, max 10 s).
+- **Batching / queue:** events are micro-batched into an IndexedDB queue and
+  delivered in batches (default 50, max 500 per request).
+- **Retry:** transient failures back off exponentially with jitter (1 s → 60 s);
+  auth/origin/contract failures pause delivery **without dropping data**.
+- **Deduplication:** by `event_id` and by identical content within 250 ms
+  (session/transition events excluded); dedup happens before `seq` assignment.
+- **Workflow transitions:** a `workflow_transition` event (`metadata.from/to`)
+  precedes the first event of a new workflow in a tab.
