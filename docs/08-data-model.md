@@ -3,7 +3,13 @@
 Owner: `windows-service`. Engine: SQLite in **WAL** mode (Component 16). All
 tables are local; ids come from `shared/src/ids.ts`.
 
-## Tables (planned schema, implemented in Phase 3)
+## Tables (implemented — `windows-service/src/db/schema.ts`)
+
+Status: `sessions`, `events`, `findings`, `runs`, `run_steps`, and `meta` are
+implemented and covered by tests. `workflows`, `screenshots`, and
+`environment_reports` are defined below and land with their owning phases
+(5/2/8 respectively).
+
 
 ### `sessions`
 | column        | type    | notes                              |

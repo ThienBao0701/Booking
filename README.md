@@ -26,16 +26,17 @@ production account.
 
 ## Status
 
-Built in phases (see `docs/adr/` and the phase list below). **Phase 0 is
-complete**: architecture, documentation, and the `shared` contracts + safety +
-redaction core, fully unit-tested.
+Built in phases (see `docs/adr/` and the phase list below). **Phases 0 and 3 are
+complete** and fully tested (64 tests, zero-install): the `shared` contracts +
+safety + redaction core, and the local background service (loopback API, event
+bus, SQLite/WAL, watchdog).
 
 | Phase | Component | State |
 |------:|-----------|-------|
 | 0 | Architecture, docs, `shared` contracts/safety/redaction | ✅ done, tested |
+| 3 | Local background service (localhost API, event bus, SQLite, watchdog) | ✅ done, tested |
 | 1 | MV3 extension skeleton (least-privilege) | ⬜ next |
 | 2 | Event recorder | ⬜ |
-| 3 | Local background service (localhost API, event bus, SQLite) | ⬜ |
 | 4 | Bridge (extension ↔ service) | ⬜ |
 | 5 | Mock Extranet | ⬜ |
 | 6–10 | Controller · replay engine · analyzer · dashboard · reports | ⬜ |
@@ -71,11 +72,16 @@ Requires **Node ≥ 22** (for TypeScript type-stripping; no build step needed fo
 dev/test).
 
 ```bash
-# Run the safety-critical core test suite — zero install required:
+# Run the safety-critical core + service test suite — zero install required:
 node --test --experimental-strip-types shared/test/*.test.ts
+node --test --experimental-strip-types --experimental-sqlite windows-service/test/*.test.ts
 
 # Or via npm scripts (workspaces):
-npm run test:shared
+npm run test:core        # shared + service
+npm run test:shared      # shared only
+
+# Start the local service (loopback only):
+node --experimental-strip-types --experimental-sqlite windows-service/src/index.ts
 
 # Typecheck the contracts (requires TypeScript, installed via pnpm/npm):
 pnpm install            # or: npm install

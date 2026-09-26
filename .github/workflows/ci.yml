@@ -9,19 +9,22 @@ permissions:
   contents: read
 
 jobs:
-  shared:
-    name: shared (contracts + safety core)
+  core:
+    name: core (shared contracts + safety + service)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      # The shared package is intentionally zero-runtime-dependency and is
-      # tested via Node's built-in runner with TypeScript type-stripping, so
-      # this job needs no network install and always runs.
+      # shared + windows-service are intentionally zero-runtime-dependency and
+      # are tested via Node's built-in runner with TypeScript type-stripping and
+      # the built-in node:sqlite, so this job needs no network install and
+      # always runs.
       - name: Unit test — shared
         run: node --test --experimental-strip-types shared/test/*.test.ts
+      - name: Unit + integration test — windows-service
+        run: node --test --experimental-strip-types --experimental-sqlite windows-service/test/*.test.ts
 
   workspaces:
     name: build / typecheck / lint (workspaces)
