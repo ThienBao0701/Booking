@@ -26,19 +26,20 @@ production account.
 
 ## Status
 
-Built in phases (see `docs/adr/` and the phase list below). **Phases 0 and 3 are
-complete** and fully tested (64 tests, zero-install): the `shared` contracts +
-safety + redaction core, and the local background service (loopback API, event
-bus, SQLite/WAL, watchdog).
+Built in phases (see `docs/adr/` and the phase list below). **Phases 0, 3, and 5
+are complete** and fully tested (75 tests, zero-install): the `shared` contracts +
+safety + redaction core, the local background service (loopback API, event bus,
+SQLite/WAL, watchdog), and the mock Extranet (safe replay target that emits the
+full workflow-event set).
 
 | Phase | Component | State |
 |------:|-----------|-------|
 | 0 | Architecture, docs, `shared` contracts/safety/redaction | ✅ done, tested |
 | 3 | Local background service (localhost API, event bus, SQLite, watchdog) | ✅ done, tested |
+| 5 | Mock Extranet (safe automation target) | ✅ done, tested |
 | 1 | MV3 extension skeleton (least-privilege) | ⬜ next |
 | 2 | Event recorder | ⬜ |
 | 4 | Bridge (extension ↔ service) | ⬜ |
-| 5 | Mock Extranet | ⬜ |
 | 6–10 | Controller · replay engine · analyzer · dashboard · reports | ⬜ |
 | 11–15 | Security hardening · tests · CI · installer | ⬜ (CI + tests scaffolded) |
 
@@ -82,6 +83,9 @@ npm run test:shared      # shared only
 
 # Start the local service (loopback only):
 node --experimental-strip-types --experimental-sqlite windows-service/src/index.ts
+
+# Start the mock Extranet (safe replay target):
+node --experimental-strip-types mock-extranet/src/index.ts   # http://127.0.0.1:4599
 
 # Typecheck the contracts (requires TypeScript, installed via pnpm/npm):
 pnpm install            # or: npm install

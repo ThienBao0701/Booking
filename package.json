@@ -19,7 +19,8 @@
     "test": "npm run test --workspaces --if-present",
     "test:shared": "node --test --experimental-strip-types shared/test/*.test.ts",
     "test:service": "node --test --experimental-strip-types --experimental-sqlite windows-service/test/*.test.ts",
-    "test:core": "node --test --experimental-strip-types --experimental-sqlite shared/test/*.test.ts windows-service/test/*.test.ts",
+    "test:mock": "node --test --experimental-strip-types mock-extranet/test/*.test.ts",
+    "test:core": "node --test --experimental-strip-types --experimental-sqlite shared/test/*.test.ts windows-service/test/*.test.ts mock-extranet/test/*.test.ts",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"

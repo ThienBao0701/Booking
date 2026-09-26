@@ -25,6 +25,8 @@ jobs:
         run: node --test --experimental-strip-types shared/test/*.test.ts
       - name: Unit + integration test — windows-service
         run: node --test --experimental-strip-types --experimental-sqlite windows-service/test/*.test.ts
+      - name: Unit + integration test — mock-extranet
+        run: node --test --experimental-strip-types mock-extranet/test/*.test.ts
 
   workspaces:
     name: build / typecheck / lint (workspaces)
